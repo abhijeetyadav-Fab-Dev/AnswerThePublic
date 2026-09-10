@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AnswerThePublic Enterprise Suite - Omnipotent Search & Keyword Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/webp" href="/favicon.webp" />
+  <link rel="shortcut icon" href="/favicon.webp" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="theme-dark">
+  <!-- Top Navigation -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-group">
+        <div class="logo-mark">
+          <img src="/favicon.webp" alt="AnswerThePublic" class="brand-logo-img" />
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">AnswerThePublic <span class="brand-badge">ENTERPRISE</span></span>
+          <span class="brand-sub">Multi-Provider Keyword & Content Intelligence Engine</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div id="modePill" class="mode-pill pill-sandbox" title="Click to configure API mode">
+          <span class="pulse-dot"></span>
+          <span id="modeText">Enterprise Sandbox</span>
+        </div>
+        <button id="btnToggleDebug" class="btn btn-secondary btn-sm" title="Toggle Developer Telemetry Console">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          Debug Console <span id="debugPillBadge" class="badge-tag badge-cyan">ON</span>
+        </button>
+        <button id="btnSettings" class="btn btn-secondary btn-sm">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          API Settings
+        </button>
+        <a href="/openapi.json" target="_blank" class="btn btn-outline btn-sm">OpenAPI Spec</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-layout">
+    <!-- Hero & Search Console -->
+    <section class="search-hero">
+      <div class="hero-content">
+        <h1 class="hero-title">Uncover What People Ask <span class="gradient-text">Across the Web & AI</span></h1>
+        <p class="hero-subtitle">Gather raw questions, prepositions, comparisons, search intent, and breakout trends across Google, YouTube, Amazon, TikTok, ChatGPT, and Gemini.</p>
+
+        <!-- Command Form -->
+        <form id="searchForm" class="search-box">
+          <div class="input-row">
+            <div class="search-input-wrap">
+              <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="keywordInput" class="search-input" placeholder="e.g. cloud security, marketing automation, coffee beans..." required autofocus />
+            </div>
+
+            <div class="geo-selectors">
+              <select id="countrySelect" class="form-select" title="Target Country / Region">
+                <option value="us">United States (US)</option>
+                <option value="gb">United Kingdom (UK)</option>
+                <option value="ca">Canada (CA)</option>
+                <option value="au">Australia (AU)</option>
+                <option value="in">India (IN)</option>
+                <option value="de">Germany (DE)</option>
+                <option value="fr">France (FR)</option>
+                <option value="es">Spain (ES)</option>
+                <option value="br">Brazil (BR)</option>
+              </select>
+
+              <select id="langSelect" class="form-select" title="Target Language">
+                <option value="en">English (en)</option>
+                <option value="es">Spanish (es)</option>
+                <option value="de">German (de)</option>
+                <option value="fr">French (fr)</option>
+                <option value="pt">Portuguese (pt)</option>
+                <option value="it">Italian (it)</option>
+                <option value="ja">Japanese (ja)</option>
+              </select>
+            </div>
+
+            <button type="submit" id="btnSubmitSearch" class="btn btn-primary btn-search">
+              <span id="btnSearchText">Run Intelligence Search</span>
+              <div id="searchSpinner" class="spinner-sm hidden"></div>
+            </button>
+          </div>
+
+          <!-- Provider Pills -->
+          <div class="provider-bar">
+            <span class="provider-label">Providers:</span>
+            <div class="provider-pills" id="providerPills">
+              <button type="button" class="pill active" data-provider="gweb">Google Web</button>
+              <button type="button" class="pill active" data-provider="youtube">YouTube</button>
+              <button type="button" class="pill active" data-provider="bing">Bing</button>
+              <button type="button" class="pill active" data-provider="amazon">Amazon</button>
+              <button type="button" class="pill active" data-provider="tiktok">TikTok</button>
+              <button type="button" class="pill active" data-provider="instagram">Instagram</button>
+              <button type="button" class="pill active" data-provider="chatgpt">ChatGPT</button>
+              <button type="button" class="pill active" data-provider="gemini">Gemini</button>
+              <button type="button" id="btnToggleAllProviders" class="pill-action">Select All</button>
+            </div>
+          </div>
+        </form>
+
+        <!-- Search Status Bar -->
+        <div id="statusBar" class="status-progress-card hidden">
+          <div class="progress-meta">
+            <span id="statusMessage" class="status-step-text">Dispatching multi-provider crawler...</span>
+            <span id="statusTimer" class="status-time">0.0s</span>
+          </div>
+          <div class="progress-track">
+            <div id="progressBar" class="progress-fill" style="width: 15%;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Workspace Results Section -->
+    <section id="resultsSection" class="results-dashboard hidden">
+      <!-- KPI Overview Bar -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-label">Total Queries</span>
+          <span id="kpiTotalQueries" class="metric-value">0</span>
+          <span class="metric-hint">Across all active branches</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Total Search Volume</span>
+          <span id="kpiTotalVolume" class="metric-value">0</span>
+          <span class="metric-hint">Monthly estimated searches</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Avg Commercial CPC</span>
+          <span id="kpiAvgCpc" class="metric-value">$0.00</span>
+          <span class="metric-hint">Search ad valuation benchmark</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">High-Intent Queries</span>
+          <span id="kpiHighIntent" class="metric-value">0%</span>
+          <span class="metric-hint">Commercial + Transactional</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Providers Active</span>
+          <span id="kpiProvidersCount" class="metric-value">0</span>
+          <span id="kpiProvidersList" class="metric-hint">gweb, youtube...</span>
+        </div>
+      </div>
+
+      <!-- Action Toolbar -->
+      <div class="dashboard-toolbar">
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs" id="viewTabs">
+          <button class="tab-btn active" data-tab="wheel">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/></svg>
+            Visual Wheels
+          </button>
+          <button class="tab-btn" data-tab="clusters">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+            Structured Clusters
+          </button>
+          <button class="tab-btn" data-tab="table">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M21 9H3"/><path d="M21 15H3"/><path d="M12 3v18"/></svg>
+            Data Matrix Table
+          </button>
+          <button class="tab-btn" data-tab="trends">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 3 7 7 4-4 7 7"/><path d="M14 13h7v7"/></svg>
+            Trends & Shopping
+          </button>
+          <button class="tab-btn" data-tab="ai">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4"/><path d="m4.93 4.93 2.83 2.83"/><path d="M2 12h4"/><path d="m4.93 19.07 2.83-2.83"/><path d="M12 18v4"/><path d="m19.07 19.07-2.83-2.83"/><path d="M18 12h4"/><path d="m19.07 4.93-2.83 2.83"/><circle cx="12" cy="12" r="3"/></svg>
+            AI Content Studio
+          </button>
+        </div>
+
+        <!-- Export & Action Buttons -->
+        <div class="export-actions">
+          <button id="btnDownloadCsv" class="btn btn-secondary btn-sm" title="Download Full CSV">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+          <button id="btnDownloadJson" class="btn btn-secondary btn-sm" title="Download Complete JSON Payload">
+            Export JSON
+          </button>
+          <button id="btnOpenArticleModal" class="btn btn-primary btn-sm">
+            Draft SEO Article
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Content 1: Visual Wheels -->
+      <div id="tab-wheel" class="tab-panel active">
+        <div class="wheel-controls">
+          <div class="wheel-type-selector">
+            <label>Wheel Source:</label>
+            <button class="wheel-btn active" data-wheel-source="questions">Questions</button>
+            <button class="wheel-btn" data-wheel-source="prepositions">Prepositions</button>
+            <button class="wheel-btn" data-wheel-source="comparisons">Comparisons</button>
+          </div>
+          <button id="btnDownloadSvg" class="btn btn-secondary btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Wheel (SVG)
+          </button>
+        </div>
+
+        <div class="wheel-viewport">
+          <div id="wheelContainer" class="svg-container"></div>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: Structured Clusters -->
+      <div id="tab-clusters" class="tab-panel">
+        <div class="clusters-container">
+          <div class="cluster-subnav">
+            <button class="subnav-btn active" data-cluster="questions">Questions (<span id="countClusterQ">0</span>)</button>
+            <button class="subnav-btn" data-cluster="prepositions">Prepositions (<span id="countClusterP">0</span>)</button>
+            <button class="subnav-btn" data-cluster="comparisons">Comparisons (<span id="countClusterC">0</span>)</button>
+            <button class="subnav-btn" data-cluster="alphabeticals">Alphabeticals (<span id="countClusterA">0</span>)</button>
+            <button class="subnav-btn" data-cluster="related">Related (<span id="countClusterR">0</span>)</button>
+          </div>
+          <div id="clusterCardsGrid" class="cluster-cards-grid"></div>
+        </div>
+      </div>
+
+      <!-- Tab Content 3: Data Matrix Table -->
+      <div id="tab-table" class="tab-panel">
+        <!-- Filter Controls -->
+        <div class="table-filter-bar">
+          <input type="text" id="tableSearchInput" class="form-input form-input-sm" placeholder="Filter rows by text..." />
+
+          <select id="filterSource" class="form-select form-select-sm">
+            <option value="all">All Sources</option>
+            <option value="questions">Questions</option>
+            <option value="prepositions">Prepositions</option>
+            <option value="comparisons">Comparisons</option>
+            <option value="alphabeticals">Alphabeticals</option>
+            <option value="related">Related</option>
+          </select>
+
+          <select id="filterIntent" class="form-select form-select-sm">
+            <option value="all">All Intents</option>
+            <option value="informational">Informational</option>
+            <option value="commercial">Commercial</option>
+            <option value="transactional">Transactional</option>
+            <option value="navigational">Navigational</option>
+          </select>
+
+          <select id="filterProvider" class="form-select form-select-sm">
+            <option value="all">All Providers</option>
+            <option value="gweb">Google</option>
+            <option value="youtube">YouTube</option>
+            <option value="bing">Bing</option>
+            <option value="amazon">Amazon</option>
+            <option value="tiktok">TikTok</option>
+            <option value="instagram">Instagram</option>
+            <option value="chatgpt">ChatGPT</option>
+            <option value="gemini">Gemini</option>
+          </select>
+
+          <div class="filter-count">
+            Showing <strong id="tableRowCount">0</strong> queries
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table" id="matrixTable">
+            <thead>
+              <tr>
+                <th data-sort="keyword">Query Keyword <span class="sort-arrow">↕</span></th>
+                <th data-sort="source">Source <span class="sort-arrow">↕</span></th>
+                <th data-sort="category">Category <span class="sort-arrow">↕</span></th>
+                <th data-sort="search_volume">Volume <span class="sort-arrow">↕</span></th>
+                <th data-sort="cpc">CPC <span class="sort-arrow">↕</span></th>
+                <th data-sort="search_intent">Intent <span class="sort-arrow">↕</span></th>
+                <th data-sort="sentiment">Sentiment <span class="sort-arrow">↕</span></th>
+                <th data-sort="provider">Provider <span class="sort-arrow">↕</span></th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab Content 4: Google Trends & Shopping -->
+      <div id="tab-trends" class="tab-panel">
+        <div class="trends-layout">
+          <!-- Trends Section -->
+          <div class="panel-box">
+            <div class="panel-header">
+              <h3 class="panel-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 3 7 7 4-4 7 7"/><path d="M14 13h7v7"/></svg>
+                Google Trends 30-Day Velocity & Breakouts
+              </h3>
+              <span class="badge-accent">Live Search Interest</span>
+            </div>
+            <div id="trendsList" class="trends-list"></div>
+          </div>
+
+          <!-- Shopping Section -->
+          <div class="panel-box">
+            <div class="panel-header">
+              <h3 class="panel-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                Top 10 Google Shopping Products
+              </h3>
+              <span class="badge-neutral">E-Commerce Intelligence</span>
+            </div>
+            <div id="shoppingList" class="shopping-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 5: AI Content Studio -->
+      <div id="tab-ai" class="tab-panel">
+        <div class="ai-studio-layout">
+          <div class="panel-box ai-ask-box">
+            <div class="panel-header">
+              <h3 class="panel-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+                Grounded Strategic Intelligence
+              </h3>
+            </div>
+            <p class="panel-desc">Ask strategic business, SEO, or product questions grounded directly in the keyword data gathered above.</p>
+
+            <div class="ai-presets">
+              <span class="preset-title">Suggested prompts:</span>
+              <button class="preset-btn" data-q="What are the top 3 commercial buyer pain points in this data?">Buyer Pain Points</button>
+              <button class="preset-btn" data-q="What high-volume questions are most likely to drive inbound conversions?">High-Conversion Questions</button>
+              <button class="preset-btn" data-q="Draft 5 viral YouTube and TikTok titles based on these question queries.">5 Viral Video Titles</button>
+            </div>
+
+            <div class="ai-input-group">
+              <textarea id="aiQuestionInput" class="ai-textarea" rows="3" placeholder="Type your question or choose a prompt above..."></textarea>
+              <button id="btnAskAi" class="btn btn-primary">
+                <span id="btnAskAiText">Generate Strategic Brief</span>
+                <div id="aiSpinner" class="spinner-sm hidden"></div>
+              </button>
+            </div>
+
+            <!-- Answer Result Box -->
+            <div id="aiAnswerBox" class="ai-answer-box hidden">
+              <div class="ai-answer-header">
+                <span class="ai-badge">AI Synthesis</span>
+                <button id="btnCopyAiAnswer" class="btn btn-sm btn-outline">Copy Brief</button>
+              </div>
+              <div id="aiAnswerContent" class="markdown-preview"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">API Gateway & Mode Settings</h3>
+        <button id="btnCloseSettings" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Operation Mode</label>
+          <div class="radio-toggle-group">
+            <label class="radio-label">
+              <input type="radio" name="apiMode" value="sandbox" id="modeRadioSandbox" checked />
+              <span><strong>Enterprise Sandbox</strong> (Simulation with real-time schemas)</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="apiMode" value="live" id="modeRadioLive" />
+              <span><strong>Live Production Gateway</strong> (Requires paid Personal Access Token)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="tokenInput">Personal Access Token (PAT)</label>
+          <input type="password" id="tokenInput" class="form-input" placeholder="atp_pk_live_xxxxxxxxxxxxxxxxxxxxxxxx" />
+          <small class="form-hint">Create tokens in your AnswerThePublic Account &rarr; API Access tab. Tokens start with <code>atp_pk_live_</code>.</small>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Developer Telemetry</label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chkVerboseDebug" checked />
+            <span>Enable Real-Time Debug Traces &amp; Telemetry</span>
+          </label>
+        </div>
+
+        <div id="tokenVerifyStatus" class="token-status-box hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnTestToken" class="btn btn-secondary">Test Connection</button>
+        <button id="btnSaveSettings" class="btn btn-primary">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Draft Article Modal -->
+  <div id="articleModal" class="modal-overlay hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3 class="modal-title">1-Click AI SEO Article Generator</h3>
+        <button id="btnCloseArticle" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Focus Keyword / Article Title</label>
+          <input type="text" id="articleTitleInput" class="form-input" />
+        </div>
+        <div class="form-actions-bar">
+          <button id="btnGenerateArticle" class="btn btn-primary">
+            <span id="btnGenerateArticleText">Draft Article from High-Intent Questions</span>
+            <div id="articleSpinner" class="spinner-sm hidden"></div>
+          </button>
+          <button id="btnCopyArticle" class="btn btn-secondary hidden">Copy Markdown</button>
+        </div>
+        <div id="articlePreview" class="article-preview-box markdown-preview hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Enterprise Debug & Telemetry Dock -->
+  <aside id="debugDock" class="debug-dock collapsed">
+    <div class="debug-dock-header">
+      <div class="debug-dock-title">
+        <span class="debug-indicator-dot"></span>
+        <strong>Debug &amp; Telemetry Console</strong>
+        <span id="dockLatency" class="dock-metric">Latency: --ms</span>
+        <span id="dockReqCount" class="dock-metric">Requests: 0</span>
+      </div>
+      <div class="debug-dock-controls">
+        <button id="btnDockClear" class="btn-dock-action" title="Clear Traces">Clear</button>
+        <button id="btnDockDump" class="btn-dock-action" title="Export Diagnostic Dump (.json)">Export Dump</button>
+        <button id="btnDockToggleSize" class="btn-dock-action" title="Expand / Minimize">&#x25B2;</button>
+        <button id="btnDockClose" class="btn-dock-action" title="Close Dock">&times;</button>
+      </div>
+    </div>
+    <div class="debug-dock-body">
+      <nav class="debug-tabs">
+        <button class="debug-tab active" data-debug-tab="tab-traces">Traces (<span id="traceCount">0</span>)</button>
+        <button class="debug-tab" data-debug-tab="tab-rawjson">Raw JSON Payload</button>
+        <button class="debug-tab" data-debug-tab="tab-system">System &amp; Server</button>
+        <button class="debug-tab" data-debug-tab="tab-logs">Console Stream (<span id="streamCount">0</span>)</button>
+      </nav>
+      <div class="debug-tab-content active" id="tab-traces">
+        <div class="debug-table-wrap">
+          <table class="debug-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="debugTracesBody">
+              <tr><td colspan="6" class="empty-state-cell">No API calls recorded yet. Run a search to see live telemetry.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="debug-tab-content" id="tab-rawjson">
+        <div class="rawjson-toolbar">
+          <span id="rawJsonSourceLabel">Payload: Active Report</span>
+          <button id="btnCopyRawJson" class="btn btn-sm btn-secondary">Copy JSON</button>
+        </div>
+        <pre class="debug-code-box"><code id="rawJsonViewer">// Run a search or select a trace from the Traces tab to inspect raw JSON.</code></pre>
+      </div>
+      <div class="debug-tab-content" id="tab-system">
+        <div class="system-metrics-grid" id="systemMetricsGrid">
+          <div class="metric-box">
+            <span class="metric-label">Server Status</span>
+            <span id="sysStatus" class="metric-val text-green">Online</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Mode</span>
+            <span id="sysMode" class="metric-val">SANDBOX</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Server Uptime</span>
+            <span id="sysUptime" class="metric-val">--</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Memory RSS</span>
+            <span id="sysMemoryRss" class="metric-val">-- MB</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Memory Heap</span>
+            <span id="sysMemoryHeap" class="metric-val">-- MB</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Node Engine</span>
+            <span id="sysNodeVer" class="metric-val">--</span>
+          </div>
+        </div>
+      </div>
+      <div class="debug-tab-content" id="tab-logs">
+        <div class="stream-toolbar">
+          <div class="stream-filters">
+            <button class="stream-filter active" data-filter="ALL">ALL</button>
+            <button class="stream-filter" data-filter="API_TRACE">API</button>
+            <button class="stream-filter" data-filter="SEARCH">SEARCH</button>
+            <button class="stream-filter" data-filter="AI">AI</button>
+            <button class="stream-filter" data-filter="SYSTEM">SYSTEM</button>
+          </div>
+          <label class="stream-autoscroll">
+            <input type="checkbox" id="chkAutoScroll" checked /> Auto-scroll
+          </label>
+        </div>
+        <div class="debug-stream-box" id="debugStreamLogs"></div>
+      </div>
+    </div>
+  </aside>
+
+  <script src="app.js"></script>
+</body>
+</html>

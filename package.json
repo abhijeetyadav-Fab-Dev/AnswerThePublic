@@ -1,0 +1,16 @@
+{
+  "name": "atp-enterprise-api",
+  "version": "1.0.0",
+  "description": "Enterprise API Client & Endpoints Suite for AnswerThePublic",
+  "main": "client.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test-master-e2e.js"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "yaml": "^2.9.0"
+  }
+}

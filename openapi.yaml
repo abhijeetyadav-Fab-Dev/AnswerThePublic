@@ -1,0 +1,1954 @@
+---
+openapi: 3.0.1
+info:
+  title: AnswerThePublic Public API
+  description: |-
+    > **This API is in Alpha.** It is under active development. Endpoints,
+    > response shapes, rate limits, and plan eligibility can change without
+    > notice, and `v1` does not yet carry a stability guarantee or a
+    > deprecation window. Build clients that ignore unknown fields, and check
+    > this page before depending on any behaviour in production. The stage
+    > that applies to your workspace is reported by `GET /me` as
+    > `api_version`.
+
+    The AnswerThePublic Public API lets you run keyword research programmatically
+    and pull the same data the in-app dashboard shows — questions, prepositions,
+    comparisons, and alphabeticals — across the providers AnswerThePublic
+    supports (Google Web, YouTube, Bing, Amazon, TikTok, Instagram, ChatGPT,
+    Gemini).
+
+    Use it to integrate keyword discovery into your own tooling: content
+    pipelines, dashboards, briefs, internal portals, or automated workflows.
+    Searches you create through the API are stored in your workspace exactly
+    like searches run from the UI, so the two surfaces stay in sync.
+
+    Two resources do most of the work: **searches** (the keyword queries
+    you create — they cost search credits) and **reports** (the structured
+    output of a completed search — read-only, and free of search credits,
+    though fetching one spends the daily read allowance described under
+    **Rate limits**). Each is explained in detail in its own section below.
+
+    ## Quick start
+    1. Open **Account → API Access** in your AnswerThePublic dashboard and
+       enable API access for the workspace.
+    2. Create a Personal Access Token, choose its scopes (see below), and copy
+       the token — it is only shown once.
+    3. Call `GET /api/public/v1/me` with the token in the `Authorization`
+       header to confirm the workspace and scopes.
+    4. Create your first search with `POST /api/public/v1/searches`.
+
+    ## Authentication
+    Every endpoint requires a Personal Access Token issued from the
+    AnswerThePublic account settings. Tokens are prefixed with
+    `atp_pk_live_` and are sent as a Bearer token in the `Authorization`
+    header:
+
+    ```
+    Authorization: Bearer atp_pk_live_<your-token>
+    ```
+
+    Tokens are tied to a single user **and** a single workspace, and they
+    inherit that user's role and that workspace's plan. Treat them like
+    passwords — never check them into source control or share them between
+    workspaces. You can revoke a token at any time from the same settings
+    page; revocation takes effect immediately.
+
+    ## Scopes
+    Scopes are chosen when the token is created and cannot be changed later.
+    A request that uses a scope the token does not hold returns `403 Forbidden`
+    with a message naming the missing scope.
+
+    | Scope             | Grants                                                                      |
+    |-------------------|-----------------------------------------------------------------------------|
+    | `searches:read`   | List and retrieve searches and their snapshots                              |
+    | `searches:write`  | Create new searches (consumes plan credits)                                 |
+    | `reports:read`    | Retrieve report payloads — keywords, volumes, intents, sentiments, sources  |
+    | `ai:read`         | List AI prompts on ChatGPT/Gemini reports (first call per report generates them and consumes plan credits) and poll generated AI answers |
+    | `ai:write`        | Request AI answer generation (consumes plan credits)                        |
+
+    Pick the **minimum** set of scopes a given integration needs. A read-only
+    dashboard, for example, never needs `searches:write`.
+
+    ## Workspaces
+    AnswerThePublic groups searches, members, and billing under a **workspace**.
+    A token is bound to one workspace at creation time, and every endpoint
+    operates implicitly on that workspace — you never have to pass a workspace
+    ID. To create searches in a different workspace, mint a separate token
+    inside that workspace.
+
+    Call `GET /api/public/v1/me` to discover which workspace, plan, and
+    scopes the active token resolves to. This is also the cheapest call to
+    use as a health check.
+
+    ## Plan eligibility
+    The API requires an **active, fully paid, recurring** AnswerThePublic
+    subscription — that is, a Monthly or Annual plan. Four plan and billing
+    states are blocked, each with its own `403` and its own machine-readable
+    `error_code` (see **Errors** below). They are not the only causes of a
+    `403`: the workspace opt-in toggle and the workspace lock are covered
+    further down.
+
+    | Workspace state | `error_code` | Message |
+    |-----------------|--------------|---------|
+    | No active paid plan — free, canceled, or paused | `ineligible_plan` | `Plan does not support API access` |
+    | **Lifetime plan** | `lifetime_api_access` | `API access is available on Monthly and Annual plans. Upgrade your plan to use the API.` |
+    | Trial not yet converted to a paid subscription | `trial_api_access` | `API access is available once your trial converts to a paid subscription` |
+    | Unpaid invoice — the subscription is in dunning | `unpaid_invoice` | `API access is paused until your outstanding invoice is paid` |
+
+    **Lifetime plans do not include API or MCP access.** Lifetime is a paid
+    plan, but it is a one-time purchase rather than a recurring subscription.
+    API and MCP access require a Monthly or Annual plan.
+
+    **Treat `atp_tier` as a label, not as the rule.** It is not what decides
+    access, and the two can disagree in both directions. A paid tier is not
+    sufficient: an unconverted Business trial already reports `atp_tier: t3`,
+    and a workspace in dunning keeps reporting the tier it bought. A
+    `lifetime` label is not conclusive either: a workspace that follows the
+    upgrade path above briefly holds both subscriptions, and eligibility is
+    decided from the subscription records with the recurring plan winning, so
+    it can legitimately get a `200` while still reporting `lifetime`. Call
+    `GET /me` and treat the `200` itself as the answer.
+
+    The workspace's tier is reported by `GET /me` as `workspace.atp_tier`:
+
+    | `atp_tier`   | Plan                           | API access | What it means                                                                                                    |
+    |--------------|--------------------------------|------------|------------------------------------------------------------------------------------------------------------------|
+    | `t1`         | Starter / Individual           | Yes        | Entry-level recurring paid plan. Lowest monthly search allowance.                                                |
+    | `t2`         | Growth / Pro                   | Yes        | Mid-tier plan with a larger monthly search allowance and more concurrent users per workspace.                     |
+    | `t3`         | Business / Expert / Enterprise | Yes        | Highest-tier plans. Largest search allowances, full provider coverage, and priority for enterprise integrations.  |
+    | `restart`    | Restart                        | Yes        | Legacy reactivation plan, billed monthly or annually, so it is a recurring subscription and eligible. Read `quota.searches` from `GET /me` for its allowance rather than assuming. |
+    | `lifetime`   | Lifetime                       | **No**     | One-time purchase plan. API and MCP access are not included — upgrade to a Monthly or Annual plan to use them.    |
+
+    Each `POST /api/public/v1/searches` consumes credits from the workspace's
+    search allowance, just like a search created from the UI. That allowance is
+    per billing cycle on current paid plans, and per day on free plans and on
+    grandfathered pre-v5 paid plans — so paid does **not** imply per-cycle. Read
+    `quota.searches.period` from `GET /me` rather than assuming. Hitting it
+    returns `429`, usually with `resets_at` and a `Retry-After` header; upgrade
+    the plan or wait for the next period to resume.
+
+    ## Workspace opt-in
+    Even with a valid paid plan, a workspace owner must explicitly turn on
+    API access from **Account → API Access**. Until then, every request from
+    the workspace's tokens returns `403 API access is disabled for this
+    workspace`. Toggling the flag off invalidates every token minted for the
+    workspace immediately — useful as a kill switch if a token leaks.
+
+    ## Workspace lock
+    A workspace can also be temporarily **locked** by AnswerThePublic — for
+    example after an overdue invoice, a payment failure, or a billing dispute.
+    While the workspace is locked, **every** public-API endpoint returns
+    `403 Workspace is locked. Please contact support or complete your
+    subscription.` until the lock is cleared. The lock is enforced
+    namespace-wide so reads and writes both stop together — there is no
+    "read-only locked" state to design around.
+
+    ## Rate limits
+    Two kinds of ceiling return `429 Too Many Requests` — a short-lived
+    **request rate** and a per-period **allowance**. When a
+    `Retry-After` header is present it gives the number of **seconds** to wait:
+    back off until it elapses, then retry. The per-minute throttle always sends
+    it; the quota ceilings send it whenever the reset instant is known (see
+    below). Treat a 429 without it as "retry later on your own backoff".
+
+    **Request rate — several per-minute ceilings, all short-lived** (the
+    `Retry-After` is on the order of a minute):
+
+    | Scope | Default |
+    |-------|---------|
+    | Per token | 60 / min |
+    | Per workspace (all its tokens combined) | 240 / min |
+    | Per IP address | 300 / min |
+    | Per token on the AI endpoints (`/reports/{id}/ai/*`) | 10 / min |
+
+    Splitting a workload across several tokens raises the per-token ceiling but
+    not the per-workspace one, so 240/min is the effective cap for a single
+    workspace. The AI ceiling is deliberately much stricter than the general one.
+    For sustained higher throughput, contact support.
+
+    **Search quota — your plan's keyword-search allowance.** `POST /searches`
+    returns 429 once the allowance for the current period is spent. Here
+    `Retry-After` can be hours or days, and `error.details` tells you exactly
+    where you stand. `Retry-After` and `resets_at` are **omitted** when the
+    reset instant cannot be determined reliably; treat that as "retry later on
+    your own backoff", not "retry now":
+
+    ```json
+    {
+      "error": {
+        "message": "Search limit reached",
+        "code": 429,
+        "details": {
+          "quota": 200, "used": 200, "remaining": 0, "period": "cycle",
+          "resets_at": "2026-08-01T00:00:00Z", "retry_after": 129600
+        }
+      }
+    }
+    ```
+
+    When `resets_at` is present, do not retry before it — the answer will not
+    change. The monthly AI **answer** allowance behaves the same way
+    (`Answer limit reached`, with its own `resets_at`). The AI **prompt**
+    allowance does not fail at all: prompts beyond it come back `blank: true`
+    inside a 200.
+
+    **Read quota — a daily allowance on the read endpoints.** `GET /searches`,
+    `GET /searches/{id}` and `GET /reports/{id}` share a per-day allowance,
+    reported as `quota.reads` on `GET /me`. Exhausting it returns 429 with
+    `error_code: "read_quota_exceeded"`, `period: "day"` and a `resets_at` at
+    the coming UTC midnight, so the wait is hours at most:
+
+    ```json
+    {
+      "error": {
+        "message": "Daily read limit reached",
+        "code": 429,
+        "error_code": "read_quota_exceeded",
+        "details": {
+          "quota": 2000, "used": 2000, "remaining": 0, "period": "day",
+          "resets_at": "2026-09-01T00:00:00Z", "retry_after": 37800
+        }
+      }
+    }
+    ```
+
+    The AI read endpoints share it too. `POST /reports/{id}/ai/prompts` re-serves
+    stored prompts on repeat calls, so it spends the allowance whenever it
+    returns content, and is refused once the allowance is gone — unless the call
+    is generating the prompts for the first time, which is never refused.
+    `POST /reports/{id}/ai/answer` spends the allowance when it returns a
+    completed answer but is **never refused** for it: an answer is retrievable
+    exactly once (`task_id` is required, and completing an answer clears it, so a
+    repeat call returns `404`), and refusing would strand work your monthly
+    AI-answer allowance already paid for. `POST
+    /reports/{id}/ai/answer_request` spends nothing, because it commissions new
+    work against that same monthly allowance.
+
+    **A read only spends the allowance when it actually returns results.**
+    Polling `GET /searches/{id}` while a search is still running is free, however
+    often you do it, and so is any 4xx, 5xx or failed search, an empty listing, a
+    page that comes back with no rows on it, and a filter combination that
+    matches nothing. `GET /me` is never counted at all, so you can poll it to
+    check where you stand without spending anything.
+
+    `POST /searches` spends the allowance too, but only when it answers with
+    finished results inlined, which is what a repeat call for a keyword you
+    already searched in the last 24 hours does. It is never refused for the read
+    allowance: once you are over it, a create still succeeds but stops inlining
+    results, returning the async `status` shape instead. Fetch the data from
+    `GET /searches/{id}` or `GET /reports/{id}` once the allowance resets.
+
+    `per_page` is capped at **500** on every read endpoint. A larger value is
+    clamped rather than rejected.
+
+    To stay ahead of either quota rather than discovering it on a rejection, read
+    the `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset`
+    (seconds until reset) headers on the response, or poll `GET /me`, whose
+    `quota.searches` and `quota.reads` blocks carry the same numbers. Unlimited
+    plans omit the `RateLimit-*` headers entirely, and `RateLimit-Reset` is
+    omitted on its own when the reset instant is not known.
+
+    `RateLimit-*` always describes **the allowance governing that endpoint**: the
+    search allowance on `POST /searches`, the daily read allowance on the four
+    gated actions. They are separate budgets, so do not compare the numbers
+    across endpoints.
+
+    Note that `RateLimit-*` never describes the per-minute request rate:
+    `RateLimit-Remaining: 88` does not license an 88-request burst, and the
+    per-minute throttle's own 429 carries only `Retry-After`.
+
+    This API is intended for server-to-server use and is not callable from a
+    browser page: the CORS origin allow-list covers only AnswerThePublic's own
+    frontends, so a cross-origin request from your own site is rejected before it
+    reaches the API. Keep your token server-side regardless.
+
+    A `403` is never fixed by an immediate retry — see the table below.
+
+    ## Errors
+    Every error response carries an `error` object with a `message` and the
+    numeric `code`. Two further fields are optional, and **no response carries
+    both**: `error_code` on the plan and billing rejections, `details` where
+    extra structured context exists.
+
+    The plainest form is message plus code, which is what a missing scope
+    returns:
+
+    ```json
+    {
+      "error": {
+        "message": "Token is missing required scope: searches:write",
+        "code": 403
+      }
+    }
+    ```
+
+    A plan or billing rejection adds `error_code`:
+
+    ```json
+    {
+      "error": {
+        "message": "API access is available on Monthly and Annual plans. Upgrade your plan to use the API.",
+        "code": 403,
+        "error_code": "lifetime_api_access"
+      }
+    }
+    ```
+
+    A validation failure adds `details`, mapping each rejected field to its
+    messages, with `message` repeating the first of them:
+
+    ```json
+    {
+      "error": {
+        "message": "can't be blank",
+        "code": 422,
+        "details": { "keyword": ["can't be blank"] }
+      }
+    }
+    ```
+
+    `code` repeats the numeric HTTP status. `details` also carries the quota
+    breakdown on a 429 (see **Rate limits** above); it is absent everywhere
+    else, including on the missing-scope 403, which names the scope in
+    `message` only.
+
+    `error_code` is a **stable, machine-readable** label for the specific
+    cause, present only on the four rejections below. `message` is always
+    English and its wording can change, so branch on `error_code` rather than
+    on `message`.
+
+    | `error_code` | Status | Cause | Clears when |
+    |--------------|--------|-------|-------------|
+    | `ineligible_plan` | `403` | The workspace has no active paid plan — free, canceled, or paused. | A Monthly or Annual plan is purchased or reactivated. |
+    | `lifetime_api_access` | `403` | The workspace is on a Lifetime plan, which does not include API or MCP access. | The workspace upgrades to a Monthly or Annual plan. |
+    | `trial_api_access` | `403` | The subscription is still in its trial. | The trial converts to a paid subscription. Access follows within minutes, and within six hours at worst. |
+    | `unpaid_invoice` | `403` | The payment processor holds an unpaid invoice for the subscription. | The invoice is paid. Access restores on its own, normally within minutes of the payment clearing and within six hours at worst. |
+
+    Other errors — a missing scope, a `404`, a validation `422` — carry no
+    `error_code` and are described by `code` and `message` alone. Common status
+    codes you should plan for:
+
+    | Status | When you'll see it                                                                                                 |
+    |--------|--------------------------------------------------------------------------------------------------------------------|
+    | `401`  | The `Authorization` header is missing, malformed, or the token is revoked, expired, or belongs to a deleted user. |
+    | `403`  | Token is valid but the request is blocked by policy: missing scope, the workspace's plan does not include API access (see **Plan eligibility**), the workspace opt-in toggle is off, or the workspace is locked. Retrying the same request changes nothing — fix the cause. The two billing causes (`trial_api_access`, `unpaid_invoice`) lift on their own once the billing state changes. |
+    | `404`  | The resource (search, report) does not exist or belongs to a different workspace.                                  |
+    | `422`  | The request body failed validation. `error.details` lists the offending fields.                                    |
+    | `429`  | **Recoverable**: per-minute request rate exceeded, or your plan's search / AI / daily-read allowance is spent. Honour `Retry-After` when present; otherwise back off on your own schedule. `error_code` is `read_quota_exceeded` for the daily read allowance and absent for the others. |
+    | `5xx`  | Transient server error. Retry with exponential backoff; if it persists, contact support.                            |
+
+    ## Versioning
+    All endpoints are namespaced under `/api/public/v1`. Breaking changes
+    are intended to land under a new prefix (`/v2`, etc.), but **while the
+    API is in alpha that is an intention rather than a guarantee**: `v1`
+    carries no committed deprecation window yet, and the notice at the top of
+    this page is the operative statement. Additive changes — new optional
+    fields, new endpoints, new providers — can land in `v1` without notice, so
+    build clients that ignore unknown fields.
+  version: 1.0.0-alpha
+  termsOfService: https://answerthepublic.com/pages/terms-and-conditions
+servers:
+- url: https://api.answerthepublic.com
+  description: Production (current)
+tags:
+- name: Me
+  description: |-
+    Inspect the user, workspace, plan, and scopes the active token resolves
+    to. Useful as a health check, for surfacing the workspace name in your
+    own UI, and for confirming a token's scopes before issuing a write call.
+- name: Searches
+  description: |-
+    A **search** is one keyword query against one provider, scoped to one
+    language and one region. For example, `marketing automation` in
+    English / United States on Google Web is one search; the same keyword
+    on YouTube is a separate search.
+
+    Creating a search via `POST /api/public/v1/searches` actually creates
+    a **parent search** that fans out into one search per provider you
+    selected (or every provider, if you didn't pick one). Each provider's
+    search runs its own asynchronous pipeline — autocomplete suggestions,
+    AI prompts where applicable, and cost-per-click enrichment — and
+    stores the result as a **snapshot**.
+
+    Searches are the queryable unit: you can list them, filter them by
+    provider / language / region, and re-fetch a single one to check
+    whether its snapshot is ready. Running the same
+    keyword + language + region twice in the workspace inside a 24-hour
+    window reuses the existing search instead of consuming credits again.
+- name: Reports
+  description: |-
+    A **report** is the structured output of a completed search — the
+    keyword rows you would see on the AnswerThePublic dashboard,
+    complete with monthly search volume, cost-per-click, intent and
+    sentiment labels (where the provider supports them), and source
+    breakdowns (questions, prepositions, comparisons, alphabeticals,
+    related).
+
+    A search produces a report; a report belongs to a search. Reports
+    are read-only and cost no search credits, but a fetch that returns
+    rows spends one of your daily reads (see **Rate limits**) — call
+    `GET /api/public/v1/reports/{id}` to slice the
+    same data different ways using the query parameters (filter by
+    provider, narrow by source bucket or category, sort, range-clip
+    volumes, etc.).
+
+    The mental model: **searches cost credits to create; reports cost no
+    further credits to read.** Run the search once, then surface its
+    report everywhere (dashboard, briefs, internal tools) without
+    spending another search credit.
+
+    Reading is not unlimited, though. A fetch that returns rows spends
+    one of the workspace's daily reads, and is refused once that
+    allowance is gone — see **Rate limits**. The two budgets are
+    separate: search credits meter what you CREATE, the daily read
+    allowance meters what we SERVE.
+- name: AI
+  description: |-
+    AI endpoints surface the prompts and generated answers tied to
+    ChatGPT and Gemini reports. A **prompt** is a question we have
+    pre-built or your team has written for a given report; an
+    **answer** is the generated text returned by the underlying AI
+    provider.
+
+    The flow is split into two phases so you can keep an HTTP request
+    cheap while the model runs:
+
+    1. `POST /reports/{id}/ai/answer_request` enqueues a generation job
+       and returns a `task_id`. Answer either a pre-built prompt
+       (`ai_prompt_id`) or your own free-form `question` grounded in the
+       report's data — supply exactly one. This call consumes plan credits
+       and requires `ai:write`.
+    2. `POST /reports/{id}/ai/answer` polls the same `task_id` until
+       the underlying model finishes. While `status` is `processing`
+       the body has no `ai_answer` and the call spends nothing; once it
+       flips to `completed` the answer is inlined and that call spends
+       one daily read. It never consumes plan credits, and it is never
+       refused for the daily read allowance — it is the only way to
+       collect an answer your monthly allowance already paid for.
+       Uses `ai:read`.
+
+    `POST /reports/{id}/ai/prompts` returns the prompts tied to a
+    report. It is `POST` rather than `GET` because the **first** call
+    against a report generates the prompts on demand, which consumes
+    plan credits the same way a ChatGPT or Gemini search does.
+    Subsequent calls return the existing prompts from storage and cost
+    no further plan credits, but each one that returns prompts spends a
+    daily read, and those repeat calls ARE refused once the allowance is
+    gone. The first, generating call is not. Uses `ai:read`.
+components:
+  responses:
+    ReadQuotaExceeded:
+      description: |-
+        Either the per-minute request rate was exceeded, or the workspace's
+        DAILY read allowance is spent (`error_code: read_quota_exceeded`, with
+        `quota`, `used`, `remaining`, `period: "day"` and a `resets_at` at the
+        coming midnight UTC in `error.details`). Only reads that actually return
+        results count toward the allowance — polling a search that is not ready
+        is free, and so is `GET /me`. Honour `Retry-After`.
+
+        **Free does not mean exempt.** Once the allowance is spent these
+        endpoints are refused outright, so a poll that would not have been
+        charged is refused too, and an in-flight search is unobservable until the
+        allowance resets. `POST /searches` is never refused, so a client can
+        start work it cannot then watch. `GET /me` keeps answering throughout.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+        RateLimit-Limit:
+          description: The daily read allowance. Absent on unlimited plans and when
+            the 429 came from the per-minute throttle.
+          schema:
+            type: integer
+        RateLimit-Remaining:
+          description: Reads left today. Absent in the same cases as `RateLimit-Limit`.
+          schema:
+            type: integer
+        RateLimit-Reset:
+          description: Seconds until the read allowance resets.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/Error"
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Personal access token (atp_pk_live_*)
+  schemas:
+    Error:
+      type: object
+      description: |-
+        Standard error envelope. Every non-2xx response uses this shape so
+        clients can rely on a single error parser.
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - message
+          - code
+          properties:
+            message:
+              type: string
+              description: Human-readable description of what went wrong. Safe to
+                surface to end users, but always English — see `error_code` for anything
+                your client needs to branch on.
+              example: 'Token is missing required scope: searches:write'
+            code:
+              type: integer
+              description: HTTP status code, mirrored here for convenience when the
+                error envelope is forwarded across a queue.
+              example: 403
+            error_code:
+              type: string
+              enum:
+              - ineligible_plan
+              - lifetime_api_access
+              - trial_api_access
+              - unpaid_invoice
+              description: |-
+                Stable machine-readable cause, present only on the four plan
+                and billing rejections (see **Errors** in the introduction).
+                Absent on every other error, including the missing-scope 403.
+              example: lifetime_api_access
+            details:
+              type: object
+              description: |-
+                Optional map of structured context: `{"keyword": ["can't be blank"]}`
+                on a 422, or the quota breakdown on a 429. Absent everywhere
+                else, and never present alongside `error_code`.
+              additionalProperties: true
+    Pagination:
+      type: object
+      description: |-
+        Page metadata for list endpoints. Use `next` and `prev` to walk the
+        result set without computing offsets yourself; both are `null` at the
+        edges.
+      properties:
+        count:
+          type: integer
+          example: 42
+          description: Total number of records that match the query, across every
+            page.
+        page:
+          type: integer
+          example: 1
+          description: 1-indexed page number this response belongs to.
+        pages:
+          type: integer
+          example: 5
+          description: Total number of pages available given the current `limit`.
+        limit:
+          type: integer
+          example: 10
+          description: Number of records requested per page.
+        from:
+          type: integer
+          example: 1
+          description: 1-indexed position of the first record on this page within
+            the full result set.
+        to:
+          type: integer
+          example: 10
+          description: 1-indexed position of the last record on this page within the
+            full result set.
+        prev:
+          type: integer
+          nullable: true
+          description: Page number to request to step backwards. `null` on the first
+            page.
+        next:
+          type: integer
+          nullable: true
+          example: 2
+          description: Page number to request to step forwards. `null` on the last
+            page.
+    Search:
+      type: object
+      description: |-
+        A provider-specific keyword search inside a workspace. Each ATP
+        keyword query produces one Search per provider — for example a
+        single `keyword + language + region` may fan out into separate
+        Search rows for `gweb`, `youtube`, `bing`, etc., grouped under one
+        `parent_search_id`.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Stable identifier for this provider-specific search. Use it
+            with `GET /api/public/v1/searches/{id}`.
+        keyword:
+          type: string
+          example: marketing automation
+          description: The query the user entered, normalised (trimmed, case-folded).
+        language:
+          type: string
+          example: en
+          description: ISO 639-1 language code used for autocompletes (e.g. `en`,
+            `es`, `pt`). Coerced to `en` for Instagram, which is English-only.
+        region:
+          type: string
+          example: us
+          description: ISO 3166-1 alpha-2 region code (e.g. `us`, `gb`, `de`). Coerced
+            to `us` for TikTok and Instagram, which only honour the global feed.
+        provider:
+          type: string
+          example: gweb
+          description: |-
+            Source the suggestions came from. One of:
+            `gweb` (Google Web), `youtube`, `bing`, `amazon`, `tiktok`,
+            `instagram`, `chatgpt`, `gemini`. Defaults to `gweb` when the
+            create call omits a provider.
+        slug:
+          type: string
+          description: URL-friendly identifier for the search inside the AnswerThePublic
+            dashboard.
+        workspace_id:
+          type: string
+          format: uuid
+          description: Workspace that owns this search. Always equal to the token's
+            bound workspace.
+        parent_search_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Identifier of the parent search that groups every provider-specific
+            run for the same `keyword + language + region`.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ParentSearch:
+      type: object
+      description: |-
+        Aggregate row that groups every provider-specific Search produced by
+        a single create call. Returned by `POST /api/public/v1/searches` so
+        clients can track all providers' progress with one polling target.
+      properties:
+        parent_search_id:
+          type: string
+          format: uuid
+          description: Identifier you can persist alongside the workspace to dedupe
+            future create calls.
+        keyword:
+          type: string
+          description: Normalised keyword shared by every child search.
+        language:
+          type: string
+          description: Language shared by every child search (where the provider supports
+            it).
+        region:
+          type: string
+          description: Region shared by every child search (where the provider supports
+            it).
+        workspace_id:
+          type: string
+          format: uuid
+          description: Workspace that owns the parent search and all its children.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+          - pending
+          - loading
+          - completed
+          - failed
+          description: |-
+            Roll-up status across every child search. Use this single field to
+            decide whether to render results or keep polling.
+
+            - `pending` — the parent row exists but no provider snapshots have started yet. Rare; usually indicates an immediate failure to enqueue.
+            - `loading` — at least one provider snapshot is still being filled in the background. Poll again shortly.
+            - `completed` — every provider snapshot is fully populated and safe to read.
+            - `failed` — at least one provider snapshot exceeded the configured loading window without completing. Inspect the per-provider `searches[].status` to see which ones failed.
+        searches:
+          type: array
+          description: One entry per provider that ran for this parent search. Use
+            the per-entry `status` to render partial results as providers complete.
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+                description: Use to fetch this provider's data with `GET /api/public/v1/searches/{id}`.
+              provider:
+                type: string
+                description: Which provider this entry belongs to (`gweb`, `youtube`,
+                  `bing`, `amazon`, `tiktok`, `instagram`, `chatgpt`, `gemini`).
+              status:
+                type: string
+                enum:
+                - loading
+                - completed
+                - failed
+                description: Status of this provider's snapshot in isolation, independent
+                  of the rolled-up `status` above.
+              snapshot:
+                description: |-
+                  Inlined snapshot payload. Omitted entirely when this provider is
+                  still `loading` or has `failed` — poll
+                  `GET /api/public/v1/searches/{id}` to fetch the data once it is
+                  ready.
+
+                  **Also omitted, with `status: "completed"`, when the workspace is
+                  over its daily read allowance.** Inlining a finished snapshot is
+                  a read, so once the allowance is spent the create still succeeds
+                  but stops carrying results. Do not branch on
+                  `status == "completed"` to decide whether `snapshot` is present:
+                  check for the key itself. `quota.reads.remaining` on `GET /me`
+                  tells you which case you are in, and the data stays reachable
+                  from the read endpoints once the allowance resets at midnight
+                  UTC.
+                nullable: true
+                type: object
+    Me:
+      type: object
+      description: Snapshot of who the token belongs to and which workspace it operates
+        in.
+      properties:
+        api_version:
+          type: string
+          example: alpha
+          description: |-
+            Release stage label for the public API surface — one of
+            `alpha`, `beta`, `ga`. While in `alpha`, endpoints and rate
+            limits may change without notice. The label is sourced
+            server-side from a feature flag so it can be flipped
+            (`alpha` → `beta` → `ga`) without a client deploy.
+        user:
+          type: object
+          description: The human who owns the token. Useful for audit trails in your
+            own logs.
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              description: Email of the user who minted the token.
+            first_name:
+              type: string
+              nullable: true
+            last_name:
+              type: string
+              nullable: true
+            preferred_language:
+              type: string
+              nullable: true
+              description: User's preferred locale for emails and the dashboard UI.
+                Has no effect on API responses.
+        workspace:
+          type: object
+          description: The workspace the token is bound to. Every endpoint operates
+            on this workspace implicitly.
+          properties:
+            id:
+              type: string
+              format: uuid
+            slug:
+              type: string
+              description: URL-friendly workspace identifier — useful for deep-linking
+                back into the AnswerThePublic dashboard.
+            name:
+              type: string
+              description: Human-readable workspace name as set in workspace settings.
+            atp_tier:
+              type: string
+              enum:
+              - restart
+              - lifetime
+              - t1
+              - t2
+              - t3
+              description: |-
+                Plan tier the workspace currently sits on. Maps to the
+                marketing names as follows: `t1` = Starter / Individual,
+                `t2` = Growth / Pro, `t3` = Business / Expert / Enterprise,
+                `lifetime` = Lifetime, `restart` = Restart (legacy
+                reactivation). **This is a label, not the access rule, and
+                the two can disagree.** A tier in this list does not imply
+                access: an unconverted trial or a subscription in dunning
+                keeps reporting the paid tier it bought while the API stays
+                blocked (`trial_api_access`, `unpaid_invoice`). Nor does
+                `lifetime` prove the opposite: eligibility is decided from the
+                subscription records, where a recurring paid plan wins, so a
+                workspace mid-upgrade from Lifetime to Monthly can report
+                `lifetime` here and still be served. Free workspaces cannot
+                reach this endpoint at all (`ineligible_plan`). See **Plan
+                eligibility** above.
+        token:
+          type: object
+          description: The active token's metadata. The token value itself is never
+            returned — store it when you create it.
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+              description: Friendly label assigned at creation time, e.g. "CI pipeline"
+                or "Reporting dashboard".
+            prefix:
+              type: string
+              example: atp_pk_live_a1b2c3
+              description: Non-secret prefix you can show in your own UI to help users
+                identify which token is in use.
+            scopes:
+              type: array
+              items:
+                type: string
+              description: Scopes granted to the token at creation time.
+            last_used_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Timestamp of the most recent successful request with this
+                token. `null` if it has never been used.
+            expires_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Optional hard expiry. `null` means the token is valid until
+                revoked.
+            created_at:
+              type: string
+              format: date-time
+        plan_slug:
+          type: string
+          nullable: true
+          description: |-
+            Active paid plan slug (e.g. `business-month-4`), or `null` on free
+            plans. More specific than `workspace.atp_tier` — use it to map the
+            workspace to its exact plan.
+        links:
+          type: object
+          description: Deep links back into the web app.
+          properties:
+            web:
+              type: string
+              format: uri
+              description: URL to this workspace's searches dashboard.
+        daily_search_budget_remaining:
+          type: integer
+          description: |-
+            Searches the workspace can still run today (mirrors the dashboard's
+            `search_left`). Same value as `quota.searches.remaining`, surfaced
+            flat for convenience before a `POST /searches` call.
+        quota:
+          type: object
+          description: |-
+            What this token can do on the current plan. Current paid plans are
+            capped per BILLING CYCLE (t1/t2/t3 = 100/200/300; custom deals may
+            differ); free plans and grandfathered pre-v5 paid plans are capped
+            per DAY — read `searches.period` rather than inferring it from the
+            plan. AI answers and prompts are capped per MONTH. Poll this block to
+            self-throttle; it is the same source `POST /searches` enforces. The
+            `reads` block is the separate DAILY allowance on the read endpoints.
+          properties:
+            searches:
+              type: object
+              properties:
+                period:
+                  type: string
+                  enum:
+                  - day
+                  - cycle
+                  description: |-
+                    `cycle` on current paid plans (billing-cycle window), `day` on
+                    free plans and on grandfathered pre-v5 paid plans, whose
+                    allowance was sold per day and clears at midnight UTC.
+                limit:
+                  type: integer
+                  nullable: true
+                  description: Search allowance for the current period. Null means
+                    unlimited.
+                remaining:
+                  type: integer
+                  nullable: true
+                  description: Searches still available in the current period. Null
+                    means unlimited.
+                resets_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: |-
+                    When the allowance rolls over — the same instant a quota
+                    `429` reports in `error.details.resets_at`. Null when
+                    unlimited. Best-effort on subscription-anchored plans, where
+                    it can be a day or two out; the 429 omits it rather than
+                    reporting a value that has already passed.
+            reads:
+              type: object
+              description: |-
+                Daily allowance shared across every metered endpoint and all
+                of the workspace's tokens: `GET /searches`,
+                `GET /searches/{id}`, `GET /reports/{id}`,
+                `POST /reports/{id}/ai/prompts`, `POST /reports/{id}/ai/answer`,
+                and `POST /searches` when it answers with results inlined. Only
+                spent by a call that actually returns results: polling a search
+                or an answer that is not ready yet is free, and so is
+                `GET /me` itself.
+              properties:
+                period:
+                  type: string
+                  enum:
+                  - day
+                  description: Always `day`. Clears at midnight UTC.
+                limit:
+                  type: integer
+                  nullable: true
+                  description: Read allowance for today. Null means unlimited.
+                used:
+                  type: integer
+                  description: Reads that have returned results so far today.
+                remaining:
+                  type: integer
+                  nullable: true
+                  description: Reads still available today. Null means unlimited.
+                resets_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  description: |-
+                    The coming midnight UTC — the same instant a read-quota `429`
+                    reports in `error.details.resets_at`. Null when unlimited.
+            ai_answers:
+              type: object
+              properties:
+                period:
+                  type: string
+                  example: month
+                limit:
+                  type: integer
+                  nullable: true
+                  description: Max AI answers per month for the plan (e.g. t1=30,
+                    t2=300, t3=1000).
+            ai_prompts:
+              type: object
+              properties:
+                period:
+                  type: string
+                  example: month
+                limit:
+                  type: integer
+                  nullable: true
+                  description: Max AI prompts per month for the plan.
+security:
+- bearerAuth: []
+paths:
+  "/api/public/v1/me":
+    get:
+      tags:
+      - Me
+      summary: Retrieve token, user, and workspace context
+      description: |-
+        Resolves the active bearer token to the user, workspace, and scopes
+        it carries. Use this as:
+
+        - A **health check** before issuing more expensive write calls — if
+          this returns 200, the token is valid and the workspace is API-eligible.
+        - A way to discover the workspace `slug` and `name` so your own UI
+          can link back into the AnswerThePublic dashboard.
+        - A way to confirm scopes after rotating a token, without trying a
+          write call and handling a 403.
+
+        Cheap to call; safe to hit on every cold start.
+      responses:
+        '200':
+          description: Token resolved successfully. Body contains the user, workspace,
+            and token metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    "$ref": "#/components/schemas/Me"
+        '401':
+          description: |-
+            The `Authorization` header is missing, malformed, or the token
+            has been revoked, expired, or belongs to a deleted user.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: |-
+            The token is valid but the workspace cannot use the API — either
+            the plan does not include API access, the workspace owner has
+            not enabled API access in settings, or the workspace is locked.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+  "/api/public/v1/searches":
+    get:
+      tags:
+      - Searches
+      summary: List parent_searches in the token's workspace
+      description: |-
+        Returns a paginated list of `parent_search` rows in the token's
+        workspace, with each parent's per-provider child searches embedded.
+        A `parent_search` groups every provider-specific Search produced by a
+        single create call — listing parents instead of flat searches keeps
+        every provider for one keyword together in the response.
+
+        Use the query parameters to narrow the result set: filter by
+        `language`/`region` to compare across markets, by `provider` to find
+        parents that ran a specific provider, or pass `q` to find parents
+        whose keyword matches a substring. Pagination metadata in
+        `data.pagination` describes the parent_search list — `count` is the
+        number of parents, not the number of children.
+
+        **Required scope:** `searches:read`.
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+          maximum: 1000
+        description: 1-indexed page number to retrieve. Capped at 1000; a larger value
+          is clamped, not rejected.
+      - in: query
+        name: per_page
+        schema:
+          type: integer
+          default: 10
+          maximum: 500
+        description: Number of `parent_search` rows per page. Larger pages reduce
+          round-trips at the cost of a bigger response payload. Capped at 500; a larger
+          value is clamped, not rejected.
+      - in: query
+        name: sort_by
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+        description: Order parents alphabetically by keyword (`asc` / `desc`). Default
+          is most recently updated first.
+      - in: query
+        name: region
+        schema:
+          type: string
+        description: Restrict to parent_searches run in this region (e.g. `us`, `gb`,
+          `de`).
+      - in: query
+        name: language
+        schema:
+          type: string
+        description: Restrict to parent_searches run in this language (e.g. `en`,
+          `es`, `pt`).
+      - in: query
+        name: provider
+        schema:
+          type: string
+        description: |-
+          Restrict to parent_searches that have at least one child search of this provider
+          (`gweb`, `youtube`, `bing`, `amazon`, `tiktok`, `instagram`, `chatgpt`, `gemini`).
+          When this filter is applied, each parent's embedded `searches` array is also
+          narrowed to the matching provider — siblings from other providers are not returned.
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Prefix-aware full-text filter on the parent_search `keyword`
+          field — handy for finding "all parents mentioning automation".
+      responses:
+        '200':
+          description: List retrieved successfully. Empty `parent_searches` array
+            if no records match the filters.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      parent_searches:
+                        type: array
+                        items:
+                          "$ref": "#/components/schemas/ParentSearch"
+                      pagination:
+                        "$ref": "#/components/schemas/Pagination"
+        '401':
+          description: Token missing, malformed, revoked, or expired.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: Token does not carry the `searches:read` scope, or the workspace
+            cannot use the API (plan / kill switch).
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          "$ref": "#/components/responses/ReadQuotaExceeded"
+    post:
+      tags:
+      - Searches
+      summary: Create a new search (consumes credits)
+      description: |-
+        Runs keyword research against AnswerThePublic's providers and stores
+        the result in the workspace. The created `parent_search` groups the
+        per-provider Search rows so you can track all of them with one
+        identifier.
+
+        **Required scope:** `searches:write`.
+
+        ## Cost
+        Each call consumes credits from the workspace's monthly allowance —
+        the same way a search created from the UI does. Hitting the
+        allowance returns `429` with `Retry-After` and a `resets_at`;
+        upgrade the plan or wait for the next billing cycle to resume
+        creating searches.
+
+        Reads (`GET /searches`, `GET /searches/{id}`, `GET /reports/{id}`)
+        cost no search credits, but they are not free: each one that
+        returns rows spends a daily read and is refused once that
+        allowance is gone. This endpoint spends a daily read too, whenever
+        it answers with results inlined, though it is never refused for
+        it. See **Rate limits**.
+
+        ## Dedupe window
+        If a `parent_search` with the same `keyword + language + region`
+        was created in the workspace in the last 24 hours, it is **reused**
+        and **no additional credits are charged**. The response will return
+        the existing parent's id so your client can continue using the same
+        identifier idempotently.
+
+        ## Async response — poll for completion
+        Keyword data is gathered in the background by per-provider jobs, so
+        the endpoint always returns `201` immediately. The response body
+        carries:
+
+        - `status`: rolled-up status across providers (`pending` /
+          `loading` / `completed` / `failed`)
+        - `searches[]`: one entry per provider with its own `status` and an
+          inlined `snapshot` *only* when that provider has already finished
+          (e.g. a 24h dedupe hit reusing fully-populated data)
+
+        Poll `GET /api/public/v1/searches/{id}` per provider until its
+        `status` reaches `completed`, then read its snapshot. This pattern
+        never ties up an HTTP connection while jobs run, which matters
+        because a single search can take a long time across the slowest
+        providers + CPC enrichment.
+
+        ## Provider selection
+        Without a `provider` field, the call fans out across every provider
+        AnswerThePublic supports (`gweb`, `youtube`, `bing`, `amazon`,
+        `tiktok`, `instagram`, `chatgpt`, `gemini`). Pass `provider` to
+        narrow the request to a single one — useful when polling rounds
+        cost something on your side.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - search
+              properties:
+                search:
+                  type: object
+                  required:
+                  - keyword
+                  - language
+                  - region
+                  properties:
+                    keyword:
+                      type: string
+                      example: marketing automation
+                      description: The query to research. Whitespace is trimmed and
+                        case is folded server-side.
+                    language:
+                      type: string
+                      example: en
+                      description: ISO 639-1 language code. Coerced to `en` for Instagram
+                        (English-only). Required so autocomplete locale matches your
+                        audience.
+                    region:
+                      type: string
+                      example: us
+                      description: ISO 3166-1 alpha-2 region code. Coerced to `us`
+                        for TikTok and Instagram, which only honour the global feed.
+                    provider:
+                      type: string
+                      nullable: true
+                      description: |-
+                        Optional. Restrict the call to a single provider —
+                        one of `gweb`, `youtube`, `bing`, `amazon`, `tiktok`,
+                        `instagram`, `chatgpt`, `gemini`. Omit (or pass
+                        `null`) to fan out across every provider.
+      responses:
+        '201':
+          description: |-
+            Search created (or an existing one within the dedupe window was
+            reused). The body carries the parent search id and a per-provider
+            `searches` array; inspect each entry's `status` to know whether
+            its snapshot is ready.
+          headers:
+            RateLimit-Limit:
+              description: Keyword-search allowance for the current period. Omitted
+                on unlimited plans.
+              schema:
+                type: integer
+            RateLimit-Remaining:
+              description: |-
+                Searches left in the current period, counting the one just
+                created. Omitted on unlimited plans.
+              schema:
+                type: integer
+            RateLimit-Reset:
+              description: |-
+                Seconds until the allowance resets. Omitted on unlimited plans,
+                and when the reset instant cannot be determined.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    "$ref": "#/components/schemas/ParentSearch"
+        '422':
+          description: |-
+            Request body failed validation — typically a missing or empty
+            `keyword`, an unsupported `language`/`region`, or an unknown
+            `provider`. `error.details` lists offending fields by name.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: Token missing, malformed, revoked, or expired.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: |-
+            Permanently blocked — one of: token missing the `searches:write`
+            scope; workspace plan does not include API access; workspace API
+            kill switch is off; or the workspace is locked. `error.message`
+            distinguishes between them. Retrying will not help.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: |-
+            Recoverable, from one of two causes, distinguishable by the body:
+
+            - **Allowance spent** (`Search limit reached`): `error.details`
+              carries `quota`, `used`, `remaining` and `period` (`day` or
+              `cycle` — the window the allowance is measured over), plus
+              `resets_at` and a `Retry-After` header when the reset instant is
+              known — both are omitted otherwise, so branch on their presence.
+            - **Per-minute request rate exceeded**: no `error.details` at all and
+              no `RateLimit-*` headers, just a message and `Retry-After`.
+          headers:
+            Retry-After:
+              description: |-
+                Seconds to wait before retrying. Always present on a per-minute
+                throttle rejection; on a spent allowance it is present only when
+                the reset instant is known.
+              schema:
+                type: integer
+            RateLimit-Limit:
+              description: |-
+                Keyword-search allowance for the current period. Present on a
+                spent-allowance rejection; absent when the 429 came from the
+                per-minute throttle instead.
+              schema:
+                type: integer
+            RateLimit-Remaining:
+              description: |-
+                Searches left in the current period (`0` on a spent allowance).
+                Absent when the 429 came from the per-minute throttle.
+              schema:
+                type: integer
+            RateLimit-Reset:
+              description: |-
+                Seconds until the allowance resets. Omitted when the reset
+                instant cannot be determined, and when the 429 came from the
+                per-minute throttle.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+  "/api/public/v1/searches/{id}":
+    get:
+      tags:
+      - Searches
+      summary: Retrieve a single search and its latest snapshot
+      description: |-
+        Returns one provider-specific search and its most recent snapshot.
+        Use this endpoint to:
+
+        - **Poll for completion** after creating a search asynchronously —
+          loop until `data.status` is `completed`, then read `data.snapshot`.
+        - **Re-fetch** an old search for a refreshed view of its snapshot.
+
+        The response always includes the search row, even when the snapshot
+        is still loading. Inspect `data.status`:
+
+        - `loading` — keyword pipeline (suggestions, AI prompts, CPC) is
+          still running. Poll again shortly; one second between calls is
+          plenty.
+        - `completed` — snapshot is fully populated. `data.snapshot` is
+          safe to render.
+        - `failed` — the snapshot timed out. AnswerThePublic considers a
+          snapshot failed if it has been loading longer than the configured
+          ceiling (defaults to a few minutes). Re-create the search to
+          retry.
+
+        **Required scope:** `searches:read`.
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Search identifier returned by `POST /api/public/v1/searches`
+          (one per provider) or by `GET /api/public/v1/searches`.
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+          maximum: 1000
+        description: 1-indexed page number for this provider's suggestions. Capped
+          at 1000; a larger value is clamped, not rejected.
+      - in: query
+        name: per_page
+        schema:
+          type: integer
+          default: 100
+          maximum: 500
+        description: Number of suggestions per page. Capped at 500; a larger value
+          is clamped, not rejected.
+      responses:
+        '200':
+          description: |-
+            Search retrieved. Always includes the search row; the `snapshot`
+            field is populated only when `status` is `completed`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      search:
+                        "$ref": "#/components/schemas/Search"
+                      snapshot:
+                        type: object
+                        nullable: true
+                        description: Inlined snapshot payload. `null` while the search
+                          is still loading or has failed.
+                      status:
+                        type: string
+                        enum:
+                        - loading
+                        - completed
+                        - failed
+                        description: |-
+                          Status of the search's latest snapshot. Drives
+                          whether `snapshot` is populated and tells the
+                          client whether to poll again.
+        '404':
+          description: No search with this id exists in the token's workspace. Either
+            the id is wrong, or the search belongs to a different workspace.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: Token missing, malformed, revoked, or expired.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: Token does not carry the `searches:read` scope, or the workspace
+            cannot use the API (plan / kill switch).
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          "$ref": "#/components/responses/ReadQuotaExceeded"
+  "/api/public/v1/reports/{id}":
+    get:
+      tags:
+      - Reports
+      summary: Retrieve report payload for a parent search
+      description: |-
+        Returns the structured report payload for a parent search — the same
+        data the AnswerThePublic dashboard renders as questions wheels,
+        prepositions, comparisons, alphabeticals, related, and source
+        breakdowns. The shape is the union of every provider's output;
+        unused fields are omitted on a per-provider basis.
+
+        Pass an `id` returned by `POST /api/public/v1/searches`
+        (the parent search id) or one of the per-provider ids — both work.
+        Use the query parameters to:
+
+        - **Filter** by provider, source, category, intent, or sentiment to
+          drill into a slice of the data.
+        - **Sort** with `sort_by` + `sort_order` to surface highest-volume
+          or lowest-cost keywords first.
+        - **Range** with `range_start_volume`/`range_end_volume` and
+          `range_start_cost`/`range_end_cost` to clip outliers.
+        - **Paginate** with `page` and `per_page` for very wide reports.
+
+        This endpoint is read-only and does **not** consume search credits. It
+        does spend the daily read allowance whenever it returns rows: see
+        **Rate limits**.
+
+        **Required scope:** `reports:read`.
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Parent search id (or a per-provider search id) to fetch the report
+          for.
+      - in: query
+        name: providers
+        schema:
+          type: string
+        example: gweb,youtube
+        description: |-
+          Comma-separated list of providers to include. Valid keys:
+          `gweb` (Google Web), `youtube`, `bing`, `amazon`, `tiktok`,
+          `instagram`, `chatgpt`, `gemini`. `google` is accepted as an
+          alias for `gweb`. Omit to include every provider. Unknown values
+          return `422` with the list of valid keys.
+      - in: query
+        name: grouped
+        schema:
+          type: boolean
+        description: When `true`, results are grouped by category/source the same
+          way the dashboard renders them. When `false`, returns a flat list.
+      - in: query
+        name: source_name
+        schema:
+          type: string
+        description: Restrict to a single source bucket (e.g. `questions`, `prepositions`,
+          `comparisons`, `alphabeticals`).
+      - in: query
+        name: category
+        schema:
+          type: string
+        description: Restrict to a single sub-category — typically the question word
+          for `questions` source (`who`, `what`, `where`, `when`, `why`, `how`, `which`,
+          `are`, `can`, `do`, `is`, `will`).
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+          maximum: 1000
+        description: 1-indexed page number for the keywords list. Capped at 1000;
+          a larger value is clamped, not rejected.
+      - in: query
+        name: per_page
+        schema:
+          type: integer
+          default: 100
+          maximum: 500
+        description: Number of keywords per page. Defaults to 100; raise it to reduce
+          round-trips on very large reports. Capped at 500; a larger value is clamped,
+          not rejected.
+      - in: query
+        name: sort_by
+        schema:
+          type: string
+        description: Field to sort by — typically `volume`, `cost_per_click`, or `keyword`.
+      - in: query
+        name: sort_order
+        schema:
+          type: string
+          enum:
+          - asc
+          - desc
+        description: Direction for `sort_by`. Defaults to `desc` for numeric fields.
+      - in: query
+        name: range_start_volume
+        schema:
+          type: number
+        description: Inclusive lower bound on monthly search volume. Use with `range_end_volume`
+          to clip the keyword list.
+      - in: query
+        name: range_end_volume
+        schema:
+          type: number
+        description: Inclusive upper bound on monthly search volume.
+      - in: query
+        name: range_start_cost
+        schema:
+          type: number
+        description: Inclusive lower bound on cost-per-click.
+      - in: query
+        name: range_end_cost
+        schema:
+          type: number
+        description: Inclusive upper bound on cost-per-click.
+      - in: query
+        name: search_string
+        schema:
+          type: string
+        description: Case-insensitive substring filter applied to the keyword text.
+      - in: query
+        name: intents
+        schema:
+          type: string
+        description: Comma-separated list of intent labels to include — e.g. `informational,transactional`.
+      - in: query
+        name: sentiments
+        schema:
+          type: string
+        description: Comma-separated list of sentiment labels to include — e.g. `positive,neutral`.
+      responses:
+        '200':
+          description: |-
+            Report retrieved. The `data` object's exact shape varies by
+            provider mix and `grouped` flag, but always carries the keyword
+            rows along with their volume, cost, intent, and sentiment fields
+            where the provider supports them.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    description: Report payload — keyword rows plus the same metadata
+                      the dashboard renders. Shape mirrors the internal `/api/v1`
+                      reports endpoint.
+                    additionalProperties: true
+        '404':
+          description: No parent search (or per-provider search) with this id exists
+            in the token's workspace.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '401':
+          description: Token missing, malformed, revoked, or expired.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: Token does not carry the `reports:read` scope, or the workspace
+            cannot use the API (plan / kill switch).
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          "$ref": "#/components/responses/ReadQuotaExceeded"
+  "/api/public/v1/reports/{id}/ai/prompts":
+    post:
+      tags:
+      - AI
+      summary: Generate (or list) AI prompts for a report
+      description: |-
+        Returns the AI prompts attached to a single ChatGPT or Gemini
+        report, paginated. Prompts are the questions surfaced for the
+        report — both pre-built ones and any user-generated entries.
+
+        ## Why `POST` for a "list" call
+        The first time this endpoint is hit for a report, the underlying
+        service **generates** the prompts on demand — they are not
+        pre-computed rows that already live in the database. Subsequent
+        calls return the same prompts from storage and behave like a
+        normal listing. We use `POST` so callers know the request is
+        non-idempotent and can mutate workspace data the first time
+        through.
+
+        ## Credit consumption
+        Generating prompts consumes the workspace's plan allowance —
+        the same allowance ChatGPT / Gemini searches draw from. Going
+        over the monthly allowance does not fail the request: the extra
+        prompts are returned flagged `blank: true`, so check that flag
+        rather than expecting an error. They still carry their text and
+        still spend a daily read. Reads against an
+        already-populated report cost no further plan credits, but they do
+        spend a daily read and are refused once that allowance is gone.
+
+        **Required scope:** `ai:read`.
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: |-
+          Any of three identifiers the workspace owns: a Report (snapshot) id, a
+          ParentSearch id, or a Search id. The endpoint resolves to the latest
+          chatgpt/gemini snapshot under whichever you supply. Same id you'd pass
+          to `GET /reports/{id}` works here — no need to learn a separate "snapshot
+          id" concept just for the AI subroutes.
+      - in: query
+        name: page
+        schema:
+          type: integer
+          default: 1
+          maximum: 1000
+        description: 1-indexed page number to retrieve. Capped at 1000; a larger value
+          is clamped, not rejected.
+      - in: query
+        name: intents
+        schema:
+          type: string
+        description: |-
+          Optional comma-separated list of intent labels to include, e.g.
+          `informational,transactional`. Same format as the `intents` filter
+          on `GET /reports/{id}` — no array/repeated-param style is supported.
+      responses:
+        '200':
+          description: Prompts retrieved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      prompts:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+                      page_info:
+                        type: object
+                        properties:
+                          page:
+                            type: integer
+                          per_page:
+                            type: integer
+                          total_pages:
+                            type: integer
+                          next_page:
+                            type: integer
+                            nullable: true
+                          previous_page:
+                            type: integer
+                            nullable: true
+        '401':
+          description: Token missing, malformed, revoked, or expired.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: |-
+            Either the token does not carry `ai:read` or the workspace cannot
+            use the API (plan / kill switch). Retrying will not help.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: Report id does not exist in the token's workspace.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: |-
+            Per-minute request rate exceeded, or the daily read allowance is
+            spent (`error_code: read_quota_exceeded` — this endpoint re-serves
+            stored prompts, so it is metered as a read). Honour `Retry-After`.
+
+            The **first** call for a report is never refused this way: it
+            generates the prompts against your monthly AI allowance rather than
+            re-serving stored ones, so the daily read allowance cannot block it.
+            It still spends one read.
+            Note that exceeding the monthly prompt allowance does NOT fail: the
+            response stays 200 and the prompts beyond your allowance come back
+            flagged `blank: true`. They still carry their text, and any page that
+            returns rows spends a daily read.
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+  "/api/public/v1/reports/{id}/ai/answer_request":
+    post:
+      tags:
+      - AI
+      summary: Request an AI answer for a prompt or free-form question (consumes credits)
+      description: |-
+        Enqueues a generation job and returns a `task_id` your client polls via
+        `POST /api/public/v1/reports/{id}/ai/answer`. This is the only
+        credit-consuming AI endpoint — every successful call charges the
+        workspace's plan allowance.
+
+        Supply **exactly one** of:
+        - `ai_prompt_id` — a canned prompt id from
+          `POST /api/public/v1/reports/{id}/ai/prompts`, or
+        - `question` — a free-form question grounded in the report's data.
+
+        **Required scope:** `ai:write`.
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: |-
+          Any of three identifiers the workspace owns: a Report (snapshot) id, a
+          ParentSearch id, or a Search id. The endpoint resolves to the latest
+          chatgpt/gemini snapshot under whichever you supply. Same id you'd pass
+          to `GET /reports/{id}` works here — no need to learn a separate "snapshot
+          id" concept just for the AI subroutes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Provide exactly one of `ai_prompt_id` or `question`.
+              oneOf:
+              - required:
+                - ai_prompt_id
+              - required:
+                - question
+              properties:
+                ai_prompt_id:
+                  type: string
+                  format: uuid
+                  description: |-
+                    Identifier of a canned prompt the model should answer
+                    (from `POST /api/public/v1/reports/{id}/ai/prompts`).
+                question:
+                  type: string
+                  description: |-
+                    A free-form question to answer using the report's data.
+                    Use this instead of `ai_prompt_id` when the consumer wants
+                    to ask their own question rather than a canned prompt.
+      responses:
+        '200':
+          description: Job enqueued. Hold the `task_id` and poll the answer endpoint.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      task_id:
+                        type: string
+        '401':
+          description: Token missing, malformed, revoked, or expired.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: |-
+            Either the token does not carry `ai:write` or the workspace cannot
+            use the API (plan / kill switch). Retrying will not help.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: Report id does not exist in the token's workspace.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: Neither `ai_prompt_id` nor `question` was provided.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: |-
+            Per-minute request rate exceeded, or the monthly AI answer
+            allowance is spent (message: `Answer limit reached`). When the reset
+            instant is known it is reported as `error.details.resets_at` plus a
+            `Retry-After` header; both are omitted otherwise.
+          headers:
+            Retry-After:
+              description: |-
+                Seconds to wait before retrying. Always present on a per-minute
+                throttle rejection; on a spent allowance it is present only when
+                the reset instant is known.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+  "/api/public/v1/reports/{id}/ai/answer":
+    post:
+      tags:
+      - AI
+      summary: Poll for an AI answer by task id
+      description: |-
+        Looks up the AI answer associated with the given `task_id`. While
+        the model is still working, the response carries `status: processing`
+        and no `ai_answer` payload. Once the underlying job finishes, the
+        same call returns `status: completed` with the inlined answer.
+
+        The `task_id` must belong to one of **this** report's prompts —
+        a `task_id` from a different report (whether in the same workspace
+        or another) returns `404`. Track the `task_id` you received from
+        `POST /reports/{id}/ai/answer_request` and always poll it against
+        the same report id you used to create it.
+
+        Does not consume search credits, but a completed answer spends the
+        daily read allowance (see **Rate limits**); polling a running task
+        does not. **Required scope:** `ai:read`.
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: |-
+          Same id family as the prompts endpoint — Report (snapshot) id,
+          ParentSearch id, or Search id, all workspace-owned. Poll against the
+          exact id you used to call `answer_request`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - task_id
+              properties:
+                task_id:
+                  type: string
+                  description: Identifier returned by `POST /reports/{id}/ai/answer_request`.
+      responses:
+        '200':
+          description: Either the polling status (`processing`) or the completed answer.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                        - processing
+                        - completed
+                      ai_answer:
+                        type: object
+                        nullable: true
+                        additionalProperties: true
+                        description: Present when `status` is `completed`. Shape mirrors
+                          `AiAnswerSerializer` from the internal API.
+        '401':
+          description: Token missing, malformed, revoked, or expired.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '403':
+          description: Token does not carry `ai:read`, or the workspace cannot use
+            the API.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '429':
+          description: |-
+            Per-minute request rate exceeded. Honour `Retry-After`.
+
+            This endpoint is **never** refused for the daily read allowance,
+            even when that allowance is spent: it is the only way to collect an
+            answer you have already paid for out of your monthly AI-answer
+            allowance, and nothing else retrieves it later. A completed answer
+            still spends one read, and polling a task that is still running
+            returns 200 with a bare `status` and spends nothing.
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '404':
+          description: |-
+            The report id is not in the token's workspace, or the `task_id`
+            does not belong to one of *this* report's prompts (cross-report
+            task_ids are rejected, not redirected).
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
+        '422':
+          description: |-
+            `task_id` is missing or blank, or the underlying generation job
+            failed. `task_id` is required: without it there is no answer to
+            identify, and the request is rejected rather than resolved to an
+            arbitrary one.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Error"
