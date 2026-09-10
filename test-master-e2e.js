@@ -38,13 +38,13 @@ async function verifyFullEndToEnd() {
         return `status: ${res.data.status}, mode: ${res.data.mode}, debug: ${res.data.debugMode}`;
     });
 
-    // 2. Favicon & WebP Asset
-    await step('GET /favicon.ico and /favicon.webp', async () => {
+    // 2. Favicon & PNG Asset
+    await step('GET /favicon.ico and /favicon.png', async () => {
         const ico = await api.get('/favicon.ico', { responseType: 'arraybuffer' });
         if (ico.status !== 200) throw new Error('favicon.ico returned ' + ico.status);
-        const webp = await api.get('/favicon.webp', { responseType: 'arraybuffer' });
-        if (webp.status !== 200 || webp.data.length < 1000) throw new Error('favicon.webp invalid');
-        return `favicon size: ${webp.data.length} bytes, content-type: ${webp.headers['content-type']}`;
+        const png = await api.get('/favicon.png', { responseType: 'arraybuffer' });
+        if (png.status !== 200 || png.data.length < 100) throw new Error('favicon.png invalid');
+        return `favicon size: ${png.data.length} bytes, content-type: ${png.headers['content-type']}`;
     });
 
     // 3. API Config & Providers
@@ -141,7 +141,7 @@ async function verifyFullEndToEnd() {
     // 13. UI Markup & Debug Console Assets
     await step('Verify Frontend UI & Debug Elements in HTML/CSS/JS', async () => {
         const html = fs.readFileSync('C:\\Users\\ydtva\\atp-enterprise-api\\public\\index.html', 'utf8');
-        if (!html.includes('favicon.webp')) throw new Error('favicon missing in index.html');
+        if (!html.includes('favicon.png')) throw new Error('favicon missing in index.html');
         if (!html.includes('id="debugDock"')) throw new Error('debugDock missing in index.html');
         if (!html.includes('id="btnToggleDebug"')) throw new Error('btnToggleDebug missing in index.html');
 

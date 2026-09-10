@@ -62,9 +62,12 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Favicon resolution
 app.get('/favicon.ico', (req, res) => {
-    const favPath = path.join(__dirname, 'public', 'favicon.webp');
-    if (fs.existsSync(favPath)) {
-        res.type('image/webp').sendFile(favPath);
+    const favPng = path.join(__dirname, 'public', 'favicon.png');
+    const favIco = path.join(__dirname, 'public', 'favicon.ico');
+    if (fs.existsSync(favPng)) {
+        res.type('image/png').sendFile(favPng);
+    } else if (fs.existsSync(favIco)) {
+        res.type('image/x-icon').sendFile(favIco);
     } else {
         res.status(204).end();
     }
