@@ -313,3 +313,9 @@ class AnswerThePublicClient {
 }
 
 module.exports = AnswerThePublicClient;
+
+// Defensive bootstrap: if client.js is invoked directly as the application entry point (e.g. by Render auto-detect)
+if (require.main === module) {
+    console.log('[BOOTSTRAP] client.js invoked directly as main entrypoint. Delegating to server.js...');
+    require('./server.js');
+}
