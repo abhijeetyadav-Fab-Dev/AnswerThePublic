@@ -668,6 +668,10 @@ function updateClusterCounts(rows) {
 function switchTab(tabName) {
     state.activeTab = tabName;
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tabs .tab-btn').forEach(b => {
+        if (b.getAttribute('data-tab') === tabName) b.classList.add('active');
+        else b.classList.remove('active');
+    });
     const target = el('tab-' + tabName);
     if (target) target.classList.add('active');
 
@@ -791,9 +795,53 @@ function renderWheel(sourceName) {
     container.innerHTML = svg;
 }
 
-window.copyQueryText = function(text) {
-    navigator.clipboard.writeText(text);
-    alert(`Copied query to clipboard:\n"${text}"`);
+function showToast(msg) {
+    let toast = document.getElementById('atpToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'atpToast';
+        toast.className = 'atp-toast';
+        document.body.appendChild(toast);
+    }
+    toast.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>${msg}</span>`;
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+        toast.classList.remove('show');
+    }, 2200);
+}
+
+window.copyQueryText = function(text, btnEl) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+    }
+    showToast(`Copied: "${text}"`);
+    if (btnEl) {
+        const orig = btnEl.innerHTML;
+        btnEl.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
+        btnEl.classList.add('btn-copied');
+        setTimeout(() => {
+            btnEl.innerHTML = orig;
+            btnEl.classList.remove('btn-copied');
+        }, 1500);
+    }
+};
+
+window.generateContentForKeyword = function(keyword) {
+    switchTab('ai');
+    const input = el('aiQuestionInput');
+    if (input) {
+        input.value = `Generate a high-converting SEO content plan, search intent analysis, and structured article outline for "${keyword}".`;
+        input.focus();
+    }
+    const articleInput = el('articleTitleInput');
+    if (articleInput) {
+        articleInput.value = `The Ultimate Guide to ${keyword.toUpperCase()} (2026 Strategy)`;
+    }
+    showToast(`Generating content for "${keyword}"...`);
+    const aiBox = document.querySelector('.ai-ask-box');
+    if (aiBox) aiBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    handleAskAi();
 };
 
 function downloadWheelSvg() {
@@ -888,13 +936,45 @@ function sortTable() {
     renderTableRows();
 }
 
+function formatVolume(val) {
+    if (val === null || val === undefined || val === '' || Number(val) <= 0) return '-';
+    const num = Number(val);
+    if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return num.toLocaleString();
+}
+
+function formatCpc(val) {
+    if (val === null || val === undefined || val === '' || Number(val) <= 0) return '-';
+    return '$' + Number(val).toFixed(2);
+}
+
+function getProviderDisplayName(p) {
+    const map = {
+        gweb: 'Google',
+        youtube: 'YouTube',
+        bing: 'Bing',
+        amazon: 'Amazon',
+        tiktok: 'TikTok',
+        instagram: 'Instagram',
+        chatgpt: 'ChatGPT',
+        gemini: 'Gemini'
+    };
+    return map[p] || (p ? p.charAt(0).toUpperCase() + p.slice(1) : 'Google');
+}
+
+function formatModifier(source, category) {
+    const src = source ? source.charAt(0).toUpperCase() + source.slice(1) : '';
+    return `${src} / ${category || ''}`;
+}
+
 function renderTableRows() {
     const tbody = el('tableBody');
     const rows = state.filteredRows;
     el('tableRowCount').innerText = rows.length.toLocaleString();
 
     if (rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:var(--text-muted);">No queries match the selected filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted);">No queries match the selected filters.</td></tr>';
         return;
     }
 
@@ -903,20 +983,43 @@ function renderTableRows() {
     tbody.innerHTML = slice.map(r => {
         const intentBadge = r.search_intent ? `<span class="badge badge-${r.search_intent}">${r.search_intent}</span>` : '-';
         const sentimentClass = r.sentiment === 'positive' ? 'badge-pos' : r.sentiment === 'negative' ? 'badge-neg' : 'badge-neu';
+        const provName = getProviderDisplayName(r.provider);
+        const safeKw = (r.keyword || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const modifierText = formatModifier(r.source, r.category);
 
         return `
-          <tr>
-            <td class="table-kw">${r.keyword}</td>
-            <td><span style="text-transform:capitalize;">${r.source}</span></td>
-            <td><code>${r.category}</code></td>
-            <td>${r.search_volume ? r.search_volume.toLocaleString() : '-'}</td>
-            <td>${r.cpc ? '$' + Number(r.cpc).toFixed(2) : '-'}</td>
-            <td>${intentBadge}</td>
-            <td><span class="${sentimentClass}" style="text-transform:capitalize;">${r.sentiment || 'neutral'}</span></td>
-            <td><span style="font-family:var(--font-mono); font-size:0.75rem; text-transform:uppercase;">${r.provider}</span></td>
-            <td>
-              <button class="btn btn-outline btn-sm" onclick="copyQueryText('${r.keyword.replace(/'/g, "\\'")}')">Copy</button>
+          <tr class="atp-data-row">
+            <td class="col-keyword">
+              <div class="kw-cell">
+                <div class="kw-top-row">
+                  <span class="provider-pill-atp provider-${r.provider || 'gweb'}">${provName}</span>
+                </div>
+                <div class="kw-text">${r.keyword}</div>
+                <div class="kw-actions">
+                  <button class="btn-atp-copy" onclick="copyQueryText('${safeKw}', this)" title="Copy keyword">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                    <span>Copy</span>
+                  </button>
+                </div>
+              </div>
             </td>
+            <td class="col-content-studio">
+              <button class="btn-atp-gen-content" onclick="generateContentForKeyword('${safeKw}')" title="Generate AI content brief for this keyword">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4"/><path d="m4.93 4.93 2.83 2.83"/><path d="M2 12h4"/><path d="m4.93 19.07 2.83-2.83"/><path d="M12 18v4"/><path d="m19.07 19.07-2.83-2.83"/><path d="M18 12h4"/><path d="m19.07 4.93-2.83 2.83"/><circle cx="12" cy="12" r="3"/></svg>
+                <span>Generate Content</span>
+              </button>
+            </td>
+            <td class="col-modifier">
+              <span class="modifier-tag">${modifierText}</span>
+            </td>
+            <td class="col-volume">
+              <span class="vol-num">${formatVolume(r.search_volume)}</span>
+            </td>
+            <td class="col-cpc">
+              <span class="cpc-num">${formatCpc(r.cpc)}</span>
+            </td>
+            <td class="col-intent">${intentBadge}</td>
+            <td class="col-sentiment"><span class="${sentimentClass}" style="text-transform:capitalize;">${r.sentiment || 'neutral'}</span></td>
           </tr>
         `;
     }).join('');

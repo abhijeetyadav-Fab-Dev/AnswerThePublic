@@ -1,16 +1,16 @@
 # Graph Report - atp-enterprise-api  (2026-09-10)
 
 ## Corpus Check
-- 12 files · ~33,411 words
+- 12 files · ~33,881 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 146 nodes · 221 edges · 10 communities (8 shown, 2 thin omitted)
-- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 10 edges (avg confidence: 0.5)
+- 151 nodes · 230 edges · 10 communities (8 shown, 2 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 10 edges (avg confidence: 0.5)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ed5c0bd5`
+- Built from commit: `7af4c99b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -34,9 +34,9 @@
 5. `renderResultsDashboard()` - 9 edges
 6. `4. Public REST API Reference (`/api/public/v1`)` - 9 edges
 7. `addDebugLog()` - 7 edges
-8. `AnswerThePublic Enterprise API Specification & Endpoints Catalog` - 7 edges
-9. `🚀 AnswerThePublic Enterprise Suite & Keyword Intelligence Platform` - 7 edges
-10. `saveSettings()` - 6 edges
+8. `renderTableRows()` - 7 edges
+9. `AnswerThePublic Enterprise API Specification & Endpoints Catalog` - 7 edges
+10. `🚀 AnswerThePublic Enterprise Suite & Keyword Intelligence Platform` - 7 edges
 
 ## Surprising Connections (you probably didn't know these)
 - None detected - all connections are within the same source files.
@@ -47,8 +47,8 @@
 ## Communities (10 total, 2 thin omitted)
 
 ### Community 0 - "app.js"
-Cohesion: 0.20
-Nodes (31): addDebugLog(), apiFetch(), applyTableFilters(), closeSettingsModal(), downloadWheelSvg(), el(), escapeHtml(), fetchConfig() (+23 more)
+Cohesion: 0.16
+Nodes (35): addDebugLog(), apiFetch(), applyTableFilters(), closeSettingsModal(), downloadWheelSvg(), el(), escapeHtml(), fetchConfig() (+27 more)
 
 ### Community 1 - "package.json"
 Cohesion: 0.11
@@ -87,9 +87,9 @@ Nodes (4): axios, runE2ETests(), sleep(), { spawn }
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `AnswerThePublic Enterprise API Specification & Endpoints Catalog` connect `4. Public REST API Reference (`/api/public/v1`)` to `🚀 AnswerThePublic Enterprise Suite & Keyword Intelligence Platform`?**
-  _High betweenness centrality (0.047) - this node is a cross-community bridge._
-- **Why does `AnswerThePublicClient` connect `AnswerThePublicClient` to `server.js`?**
   _High betweenness centrality (0.044) - this node is a cross-community bridge._
+- **Why does `AnswerThePublicClient` connect `AnswerThePublicClient` to `server.js`?**
+  _High betweenness centrality (0.041) - this node is a cross-community bridge._
 - **Are the 9 inferred relationships involving `setupEventListeners()` (e.g. with `applyTableFilters()` and `closeSettingsModal()`) actually correct?**
   _`setupEventListeners()` has 9 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `axios`, `{ v4: uuidv4 }`, `name` to the rest of the system?**

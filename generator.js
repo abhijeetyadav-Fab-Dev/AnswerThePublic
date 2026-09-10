@@ -42,25 +42,30 @@ function classifySentiment(text) {
     return 'neutral';
 }
 
-function computeMetrics(queryText, stem = '', baseMultiplier = 1) {
+function computeMetrics(queryText, stem = '', baseMultiplier = 1, rank = 0) {
     const h = simpleHash(queryText);
     const intent = classifyIntent(queryText, stem);
     const sentiment = classifySentiment(queryText);
 
-    const words = queryText.trim().split(/\s+/).length;
     let baseVol;
-    if (words <= 3) baseVol = 3500 + (h % 28000);
-    else if (words <= 5) baseVol = 900 + (h % 8400);
-    else baseVol = 120 + (h % 1900);
+    if (rank === 0) {
+        baseVol = 18000 + (h % 15000); // 18K - 33K (e.g. 22.2K)
+    } else if (rank <= 2) {
+        baseVol = 2100 + (h % 4500);  // 2.1K - 6.6K
+    } else if (rank <= 5) {
+        baseVol = 450 + (h % 900);    // 450 - 1350
+    } else {
+        baseVol = 80 + (h % 320);     // 80 - 400 (e.g. 260, 210)
+    }
 
-    const volume = Math.max(50, Math.round(baseVol * baseMultiplier));
+    const volume = Math.max(30, Math.round(baseVol * baseMultiplier));
 
     let cpcBase;
     if (intent === 'transactional') cpcBase = 2.40 + ((h % 480) / 100);
     else if (intent === 'commercial') cpcBase = 1.60 + ((h % 340) / 100);
     else cpcBase = 0.30 + ((h % 150) / 100);
 
-    const cpc = Number(cpcBase.toFixed(2));
+    const cpc = (h % 4 === 0) ? null : Number(cpcBase.toFixed(2));
 
     return { volume, cpc, intent, sentiment };
 }
@@ -144,10 +149,10 @@ async function generateRealisticReport(keyword, language = 'en', region = 'us', 
             const rawList = list.length > 0 ? list : fallback;
             const seen = new Set();
             const items = [];
-            rawList.forEach(item => {
+            rawList.forEach((item, idx) => {
                 if (!seen.has(item)) {
                     seen.add(item);
-                    const m = computeMetrics(item, stem, mult);
+                    const m = computeMetrics(item, stem, mult, idx);
                     items.push({
                         keyword: item,
                         source: 'questions',
@@ -173,10 +178,10 @@ async function generateRealisticReport(keyword, language = 'en', region = 'us', 
             const rawList = list.length > 0 ? list : fallback;
             const seen = new Set();
             const items = [];
-            rawList.forEach(item => {
+            rawList.forEach((item, idx) => {
                 if (!seen.has(item)) {
                     seen.add(item);
-                    const m = computeMetrics(item, stem, mult);
+                    const m = computeMetrics(item, stem, mult, idx);
                     items.push({
                         keyword: item,
                         source: 'prepositions',
@@ -201,10 +206,10 @@ async function generateRealisticReport(keyword, language = 'en', region = 'us', 
             const rawList = list.length > 0 ? list : fallback;
             const seen = new Set();
             const items = [];
-            rawList.forEach(item => {
+            rawList.forEach((item, idx) => {
                 if (!seen.has(item)) {
                     seen.add(item);
-                    const m = computeMetrics(item, stem, mult);
+                    const m = computeMetrics(item, stem, mult, idx);
                     items.push({
                         keyword: item,
                         source: 'comparisons',
@@ -226,13 +231,13 @@ async function generateRealisticReport(keyword, language = 'en', region = 'us', 
             const fallback = [
                 `${cleanKw} ${letter} guide`
             ];
-            const rawList = list.length > 0 ? list.slice(0, 6) : fallback;
+            const rawList = list.length > 0 ? list : fallback;
             const seen = new Set();
             const items = [];
-            rawList.forEach(item => {
+            rawList.forEach((item, idx) => {
                 if (!seen.has(item)) {
                     seen.add(item);
-                    const m = computeMetrics(item, letter, mult);
+                    const m = computeMetrics(item, letter, mult, idx);
                     items.push({
                         keyword: item,
                         source: 'alphabeticals',
@@ -249,8 +254,8 @@ async function generateRealisticReport(keyword, language = 'en', region = 'us', 
         });
 
         // 5. Related
-        const related = (relResults.length > 0 ? relResults.slice(0, 10) : [`${cleanKw} guide`, `${cleanKw} reviews`]).map(item => {
-            const m = computeMetrics(item, 'related', mult);
+        const related = (relResults.length > 0 ? relResults.slice(0, 10) : [`${cleanKw} guide`, `${cleanKw} reviews`]).map((item, idx) => {
+            const m = computeMetrics(item, 'related', mult, idx);
             return {
                 keyword: item,
                 source: 'related',

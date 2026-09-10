@@ -4,9 +4,8 @@
   "2": "server.js",
   "3": "AnswerThePublicClient",
   "4": "🚀 AnswerThePublic Enterprise Suite & Keyword Intelligence Platform",
-  "5": "AnswerThePublic Enterprise API Specification & Endpoints Catalog",
-  "6": "4. Public REST API Reference (`/api/public/v1`)",
-  "7": "client.js",
+  "5": "4. Public REST API Reference (`/api/public/v1`)",
+  "6": "generator.js",
   "8": "test-master-e2e.js",
   "9": "test-server-e2e.js",
   "10": "test-live-suite.js"
