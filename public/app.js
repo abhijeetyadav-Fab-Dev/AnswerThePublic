@@ -13,7 +13,7 @@ const state = {
     filteredRows: [],
     sortColumn: 'search_volume',
     sortAsc: false,
-    selectedProviders: ['gweb', 'youtube', 'bing', 'amazon', 'tiktok', 'instagram', 'chatgpt', 'gemini']
+    selectedProviders: ['gweb']
 };
 
 // DOM References
@@ -396,18 +396,29 @@ function setupEventListeners() {
             } else {
                 state.selectedProviders = state.selectedProviders.filter(p => p !== prov);
             }
+            if (state.selectedProviders.length === 0) {
+                state.selectedProviders = ['gweb'];
+                const gwebPill = document.querySelector('.pill[data-provider="gweb"]');
+                if (gwebPill) gwebPill.classList.add('active');
+            }
+            if (el('btnToggleAllProviders')) {
+                el('btnToggleAllProviders').innerText = state.selectedProviders.length === 8 ? 'Deselect All' : 'Select All';
+            }
         });
     });
 
-    el('btnToggleAllProviders').addEventListener('click', () => {
-        const allActive = state.selectedProviders.length === 8;
-        state.selectedProviders = allActive ? ['gweb'] : ['gweb', 'youtube', 'bing', 'amazon', 'tiktok', 'instagram', 'chatgpt', 'gemini'];
-        pills.forEach(p => {
-            const prov = p.getAttribute('data-provider');
-            if (state.selectedProviders.includes(prov)) p.classList.add('active');
-            else p.classList.remove('active');
+    if (el('btnToggleAllProviders')) {
+        el('btnToggleAllProviders').addEventListener('click', () => {
+            const allActive = state.selectedProviders.length === 8;
+            state.selectedProviders = allActive ? ['gweb'] : ['gweb', 'youtube', 'bing', 'amazon', 'tiktok', 'instagram', 'chatgpt', 'gemini'];
+            pills.forEach(p => {
+                const prov = p.getAttribute('data-provider');
+                if (state.selectedProviders.includes(prov)) p.classList.add('active');
+                else p.classList.remove('active');
+            });
+            el('btnToggleAllProviders').innerText = allActive ? 'Select All' : 'Deselect All';
         });
-    });
+    }
 
     // Search Form
     el('searchForm').addEventListener('submit', (e) => {

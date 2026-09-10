@@ -261,7 +261,7 @@ app.post('/api/search', async (req, res) => {
         }
 
         // Sandbox Generation Mode:
-        const synthetic = generateRealisticReport(cleanKw, language, region, providers);
+        const synthetic = await generateRealisticReport(cleanKw, language, region, providers);
         const reportId = synthetic.data.report_id;
         reportsStore.set(reportId, synthetic);
 

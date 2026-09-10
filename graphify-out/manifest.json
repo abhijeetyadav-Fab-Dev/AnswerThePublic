@@ -1,0 +1,92 @@
+{
+  "client.js": {
+    "mtime": 1789036546.7325993,
+    "seen": 1789044104.5156806,
+    "ast_hash": "dab2848f1eac93ac9c6aa56ef2e60062",
+    "semantic_hash": ""
+  },
+  "generator.js": {
+    "mtime": 1789044033.9176028,
+    "seen": 1789044104.515688,
+    "ast_hash": "165290862f12f381a0ab0925f3fad71d",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1789036563.6120112,
+    "seen": 1789044104.5156913,
+    "ast_hash": "63f9fbcc6459d7509917373dd025fb43",
+    "semantic_hash": ""
+  },
+  "public/app.js": {
+    "mtime": 1789041498.0934541,
+    "seen": 1789044104.515694,
+    "ast_hash": "eb68fe70f8f53a73a162a597785bce5f",
+    "semantic_hash": ""
+  },
+  "server.js": {
+    "mtime": 1789041442.485317,
+    "seen": 1789044104.5156956,
+    "ast_hash": "4a02bedfd74ab95d3a3ff70dffaab2f2",
+    "semantic_hash": ""
+  },
+  "test-client.js": {
+    "mtime": 1789022582.8579578,
+    "seen": 1789044104.5156972,
+    "ast_hash": "761afb3e8bd982ad64cde2c0433eba9f",
+    "semantic_hash": ""
+  },
+  "test-live-suite.js": {
+    "mtime": 1789023307.0167398,
+    "seen": 1789044104.5156987,
+    "ast_hash": "2164cbf978b7bdc545cb7cac303c3977",
+    "semantic_hash": ""
+  },
+  "test-master-e2e.js": {
+    "mtime": 1789026401.413841,
+    "seen": 1789044104.5157003,
+    "ast_hash": "343d95710c3919db75c42f7fc56f6f8a",
+    "semantic_hash": ""
+  },
+  "test-server-e2e.js": {
+    "mtime": 1789023280.0714805,
+    "seen": 1789044104.515702,
+    "ast_hash": "336b54e0a28470cd8c6ad812b1da7450",
+    "semantic_hash": ""
+  },
+  "ENDPOINTS.md": {
+    "mtime": 1789022554.8638823,
+    "seen": 1789044104.5157046,
+    "ast_hash": "72d130875c6e97b3ccfeec40f1fa30cb",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1789025873.7645938,
+    "seen": 1789044104.5157068,
+    "ast_hash": "77c679c5e5dae29dbeeecb484845a46d",
+    "semantic_hash": ""
+  },
+  "openapi.yaml": {
+    "mtime": 1789022300.7467003,
+    "seen": 1789044104.5157096,
+    "ast_hash": "426833a0d6dc41020330a86a6d38450b",
+    "semantic_hash": ""
+  },
+  "public/index.html": {
+    "mtime": 1789041482.2242136,
+    "seen": 1789044104.515712,
+    "ast_hash": "9a0c9cdbd6f0a72ae03ce83e6df8182d",
+    "semantic_hash": ""
+  },
+  "render.yaml": {
+    "mtime": 1789036586.0091875,
+    "seen": 1789044104.515714,
+    "ast_hash": "03b18eae5cdbed77a1b2a1eda5dab9e8",
+    "semantic_hash": ""
+  },
+  "public/favicon.png": {
+    "mtime": 1785316206.2785242,
+    "seen": 1789044104.5157166,
+    "ast_hash": "0c0976decbc4af6c630e33d91dd70579",
+    "semantic_hash": ""
+  }
+}
