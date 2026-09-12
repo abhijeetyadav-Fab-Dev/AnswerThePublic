@@ -706,7 +706,7 @@ function renderWheel(sourceName) {
         }
     });
 
-    const categoryKeys = Object.keys(categoriesMap);
+    const categoryKeys = Object.keys(categoriesMap).filter(k => Array.isArray(categoriesMap[k]) && categoriesMap[k].length > 0);
     if (categoryKeys.length === 0) {
         container.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted);">No queries found for ${sourceName}.</div>`;
         return;
